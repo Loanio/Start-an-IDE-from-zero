@@ -1,0 +1,7 @@
+{
+  "id": "word-count",
+  "name": "Word Count",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.wordcount.WordCountPlugin",
+  "dependencies": []
+}

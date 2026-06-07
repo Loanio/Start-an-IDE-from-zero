@@ -1,0 +1,105 @@
+.app-root {
+    -fx-background-color: #1e1e1e;
+    -fx-font-family: "Segoe UI", "Inter", "Arial";
+}
+
+.menu-bar {
+    -fx-background-color: #181818;
+    -fx-border-color: #2d2d2d;
+    -fx-border-width: 0 0 1 0;
+}
+
+.menu-bar .label {
+    -fx-text-fill: #d4d4d4;
+}
+
+.context-menu {
+    -fx-background-color: #252526;
+    -fx-border-color: #3c3c3c;
+}
+
+.menu-item:focused {
+    -fx-background-color: #094771;
+}
+
+.split-pane {
+    -fx-background-color: #1e1e1e;
+}
+
+.split-pane-divider {
+    -fx-background-color: #2d2d2d;
+    -fx-padding: 0 1 0 1;
+}
+
+.sidebar {
+    -fx-background-color: #252526;
+    -fx-padding: 14;
+    -fx-border-color: #2d2d2d;
+    -fx-border-width: 0 1 0 0;
+}
+
+.sidebar-title {
+    -fx-text-fill: #bbbbbb;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.project-name {
+    -fx-text-fill: #f3f3f3;
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+}
+
+.plugin-list {
+    -fx-background-color: #1f1f1f;
+    -fx-control-inner-background: #1f1f1f;
+    -fx-border-color: #333333;
+}
+
+.plugin-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #d4d4d4;
+    -fx-padding: 8 10;
+}
+
+.plugin-list .list-cell:selected {
+    -fx-background-color: #094771;
+    -fx-text-fill: #ffffff;
+}
+
+.plugin-actions .button {
+    -fx-background-color: #0e639c;
+    -fx-text-fill: white;
+    -fx-background-radius: 4;
+    -fx-padding: 7 10;
+}
+
+.plugin-actions .button:hover {
+    -fx-background-color: #1177bb;
+}
+
+.code-editor {
+    -fx-background-color: #1e1e1e;
+    -fx-control-inner-background: #1e1e1e;
+    -fx-text-fill: #d4d4d4;
+    -fx-highlight-fill: #264f78;
+    -fx-highlight-text-fill: #ffffff;
+    -fx-font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 14px;
+}
+
+.code-editor .content {
+    -fx-background-color: #1e1e1e;
+}
+
+.status-bar {
+    -fx-background-color: #007acc;
+    -fx-min-height: 24;
+    -fx-pref-height: 24;
+    -fx-alignment: center-left;
+}
+
+.status-item {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 12px;
+}

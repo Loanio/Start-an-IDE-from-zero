@@ -1,0 +1,12 @@
+.gradle/
+build/
+out/
+*.log
+*.class
+
+editor-api/build/
+editor-core/build/
+plugins/*/build/
+
+.idea/
+*.iml

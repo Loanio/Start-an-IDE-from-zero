@@ -1,0 +1,21 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        mavenCentral()
+    }
+}
+
+rootProject.name = "zero-ide"
+
+include "editor-api"
+include "editor-core"
+include "plugins:word-count-plugin"
+include "plugins:markdown-tools-plugin"
+include "plugins:java-snippets-plugin"

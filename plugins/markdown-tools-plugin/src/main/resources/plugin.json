@@ -1,0 +1,7 @@
+{
+  "id": "markdown-tools",
+  "name": "Markdown Tools",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.markdown.MarkdownToolsPlugin",
+  "dependencies": []
+}

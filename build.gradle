@@ -1,0 +1,51 @@
+plugins {
+    id "java"
+}
+
+allprojects {
+    group = "com.zeroide"
+    version = "0.1.0"
+}
+
+subprojects {
+    apply plugin: "java"
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = "UTF-8"
+        options.release = 21
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+    }
+
+    dependencies {
+        testImplementation platform("org.junit:junit-bom:5.10.3")
+        testImplementation "org.junit.jupiter:junit-jupiter"
+        testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+    }
+}
+
+def runtimePluginDir = layout.buildDirectory.dir("runtime/plugins")
+def pluginProjects = [
+        project(":plugins:word-count-plugin"),
+        project(":plugins:markdown-tools-plugin"),
+        project(":plugins:java-snippets-plugin")
+]
+
+tasks.register("copyRuntimePlugins", Copy) {
+    dependsOn pluginProjects.collect { it.tasks.named("jar") }
+    from(pluginProjects.collect { it.tasks.named("jar") })
+    into runtimePluginDir
+}
+
+tasks.register("runIde") {
+    group = "application"
+    description = "Build sample plugins and run the JavaFX editor."
+    dependsOn ":editor-core:run"
+}

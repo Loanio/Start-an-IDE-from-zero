@@ -1,0 +1,7 @@
+{
+  "id": "java-snippets",
+  "name": "Java Snippets",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.java.JavaSnippetsPlugin",
+  "dependencies": []
+}
