@@ -1,9 +1,16 @@
 plugins {
-    id "java-library"
     id "org.openjfx.javafxplugin" version "0.1.0"
+}
+
+dependencies {
+    compileOnly project(":editor-api")
 }
 
 javafx {
     version = "21.0.4"
     modules = ["javafx.controls"]
+}
+
+tasks.named("jar") {
+    archiveBaseName = "markdown-preview-plugin"
 }

@@ -35,7 +35,12 @@ def runtimePluginDir = layout.buildDirectory.dir("runtime/plugins")
 def pluginProjects = [
         project(":plugins:word-count-plugin"),
         project(":plugins:markdown-tools-plugin"),
-        project(":plugins:java-snippets-plugin")
+        project(":plugins:java-snippets-plugin"),
+        project(":plugins:file-tree-plugin"),
+        project(":plugins:search-plugin"),
+        project(":plugins:git-plugin"),
+        project(":plugins:terminal-plugin"),
+        project(":plugins:markdown-preview-plugin")
 ]
 
 tasks.register("copyRuntimePlugins", Copy) {

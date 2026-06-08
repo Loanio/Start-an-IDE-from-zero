@@ -47,6 +47,17 @@ public final class JavaFxEditorService implements EditorService {
     }
 
     @Override
+    public void selectRange(int start, int end) {
+        runOnFxThread(() -> {
+            int length = textArea.getLength();
+            int safeStart = Math.max(0, Math.min(start, length));
+            int safeEnd = Math.max(safeStart, Math.min(end, length));
+            textArea.requestFocus();
+            textArea.selectRange(safeStart, safeEnd);
+        });
+    }
+
+    @Override
     public Optional<Path> getCurrentFile() {
         return Optional.ofNullable(currentFile);
     }

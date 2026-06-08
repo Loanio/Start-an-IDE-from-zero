@@ -7,6 +7,8 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.layout.HBox;
 
 import java.util.LinkedHashMap;
@@ -15,12 +17,15 @@ import java.util.Map;
 public final class JavaFxUiService implements UIService {
     private final MenuBar menuBar;
     private final HBox statusBar;
+    private final TabPane toolPanels;
     private final Map<String, Label> statusItems = new LinkedHashMap<>();
     private final Map<String, MenuItem> menuItems = new LinkedHashMap<>();
+    private final Map<String, Tab> panelItems = new LinkedHashMap<>();
 
-    public JavaFxUiService(MenuBar menuBar, HBox statusBar) {
+    public JavaFxUiService(MenuBar menuBar, HBox statusBar, TabPane toolPanels) {
         this.menuBar = menuBar;
         this.statusBar = statusBar;
+        this.toolPanels = toolPanels;
     }
 
     @Override
@@ -77,6 +82,31 @@ public final class JavaFxUiService implements UIService {
                 for (Menu menu : menuBar.getMenus()) {
                     menu.getItems().remove(menuItem);
                 }
+            }
+        });
+    }
+
+    @Override
+    public void addToolPanel(String id, String title, javafx.scene.Node content) {
+        runOnFxThread(() -> {
+            removeToolPanel(id);
+            boolean selectNewPanel = toolPanels.getTabs().isEmpty();
+            Tab tab = new Tab(title, content);
+            tab.setClosable(false);
+            panelItems.put(id, tab);
+            toolPanels.getTabs().add(tab);
+            if (selectNewPanel) {
+                toolPanels.getSelectionModel().select(tab);
+            }
+        });
+    }
+
+    @Override
+    public void removeToolPanel(String id) {
+        runOnFxThread(() -> {
+            Tab tab = panelItems.remove(id);
+            if (tab != null) {
+                toolPanels.getTabs().remove(tab);
             }
         });
     }

@@ -1,0 +1,7 @@
+{
+  "id": "file-tree",
+  "name": "File Tree",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.filetree.FileTreePlugin",
+  "dependencies": []
+}

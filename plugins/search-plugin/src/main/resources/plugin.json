@@ -1,0 +1,7 @@
+{
+  "id": "search",
+  "name": "Search",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.search.SearchPlugin",
+  "dependencies": []
+}

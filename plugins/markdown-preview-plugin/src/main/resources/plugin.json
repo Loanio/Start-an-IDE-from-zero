@@ -1,0 +1,7 @@
+{
+  "id": "markdown-preview",
+  "name": "Markdown Preview",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.markdownpreview.MarkdownPreviewPlugin",
+  "dependencies": []
+}

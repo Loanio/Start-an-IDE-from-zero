@@ -10,6 +10,8 @@ public interface EditorService {
 
     void insertText(String text);
 
+    void selectRange(int start, int end);
+
     Optional<Path> getCurrentFile();
 
     void openFile(Path path);

@@ -1,0 +1,7 @@
+{
+  "id": "git",
+  "name": "Git",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.git.GitPlugin",
+  "dependencies": []
+}

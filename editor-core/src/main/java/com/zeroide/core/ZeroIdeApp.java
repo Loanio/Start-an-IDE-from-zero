@@ -23,6 +23,7 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
@@ -46,6 +47,7 @@ public final class ZeroIdeApp extends Application {
     private Label fileLabel;
     private Label metricsLabel;
     private ListView<LoadedPlugin> pluginList;
+    private TabPane toolPanelTabs;
     private CoreContainer container;
     private DynamicPluginManager pluginManager;
     private JavaFxEditorService editorService;
@@ -64,9 +66,10 @@ public final class ZeroIdeApp extends Application {
         editor = buildEditor();
         HBox statusBar = buildStatusBar();
         pluginList = buildPluginList();
+        toolPanelTabs = buildToolPanelTabs();
 
         Path pluginDirectory = resolvePluginDirectory();
-        container = CoreContainer.create(editor, menuBar, statusBar, stage, pluginDirectory);
+        container = CoreContainer.create(editor, menuBar, statusBar, toolPanelTabs, stage, pluginDirectory);
         pluginManager = container.getBean(DynamicPluginManager.class);
         editorService = (JavaFxEditorService) container.getBean(EditorService.class);
 
@@ -197,9 +200,17 @@ public final class ZeroIdeApp extends Application {
 
     private SplitPane buildWorkspace() {
         SplitPane splitPane = new SplitPane();
-        splitPane.getItems().addAll(buildSidebar(), editor);
-        splitPane.setDividerPositions(0.26);
+        splitPane.getItems().addAll(buildSidebar(), editor, toolPanelTabs);
+        splitPane.setDividerPositions(0.22, 0.72);
         return splitPane;
+    }
+
+    private TabPane buildToolPanelTabs() {
+        TabPane tabs = new TabPane();
+        tabs.getStyleClass().add("tool-tabs");
+        tabs.setMinWidth(300);
+        tabs.setPrefWidth(360);
+        return tabs;
     }
 
     private VBox buildSidebar() {

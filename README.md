@@ -23,7 +23,12 @@ zero-ide
 └── plugins
     ├── word-count-plugin      # 字数统计状态栏插件
     ├── markdown-tools-plugin  # Markdown 菜单与大纲插件
-    └── java-snippets-plugin   # Java 代码片段插件
+    ├── java-snippets-plugin   # Java 代码片段插件
+    ├── file-tree-plugin       # 文件树插件
+    ├── search-plugin          # 当前文件搜索与替换插件
+    ├── git-plugin             # Git 状态、日志、差异插件
+    ├── terminal-plugin        # 终端命令插件
+    └── markdown-preview-plugin # Markdown 预览插件
 ```
 
 ## 运行
@@ -80,7 +85,7 @@ public interface Plugin {
 - `EditorContext` 暴露编辑器服务、事件总线和 UI 服务。
 - `DynamicPluginManager` 负责扫描 jar、读取描述文件、校验依赖、反射创建插件实例、加载和卸载插件。
 - `DefaultEventBus` 使用观察者模式，插件可以订阅 `TextChangedEvent`、`FileOpenedEvent`、`FileSavedEvent` 等事件。
-- `JavaFxUiService` 允许插件添加状态栏项、菜单项和信息弹窗。
+- `JavaFxUiService` 允许插件添加状态栏项、菜单项、工具面板和信息弹窗。
 - 卸载插件时会调用 `onUnload()`，移除 UI 扩展，并关闭对应 `URLClassLoader`。
 
 ## 测试
@@ -94,5 +99,5 @@ public interface Plugin {
 - 用 RichTextFX 替换 JavaFX `TextArea`，实现真正的语法高亮。
 - 增加插件权限模型，限制不可信插件访问核心资源。
 - 增加插件依赖版本范围和冲突检测。
-- 增加 Git 插件、代码补全插件、宏录制插件。
+- 增加代码补全插件、宏录制插件。
 - 使用 `jlink` 或 `jpackage` 打包桌面应用。
