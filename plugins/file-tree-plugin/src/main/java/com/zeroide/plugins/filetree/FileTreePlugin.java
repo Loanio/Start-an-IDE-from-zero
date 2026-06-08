@@ -36,11 +36,12 @@ public final class FileTreePlugin implements Plugin {
     @Override
     public void onLoad(EditorContext context) {
         this.context = context;
-        context.ui().addStatusItem(STATUS_ID, "File tree");
-        context.ui().addMenuAction("Explorer", REFRESH_ID, "Refresh File Tree", this::refresh);
-        context.ui().addToolPanel(PANEL_ID, "Files", buildPanel());
+        context.notifications().addStatusItem(STATUS_ID, "File tree");
+        context.commands().registerCommand(REFRESH_ID, "Refresh File Tree", this::refresh);
+        context.commands().addMenuItem("Explorer", REFRESH_ID, REFRESH_ID);
+        context.panels().addSidebarPanel(PANEL_ID, "Files", buildPanel());
         fileSubscription = context.events().subscribe(FileOpenedEvent.class, event ->
-                context.ui().updateStatusItem(STATUS_ID, "Opened " + event.path().getFileName())
+                context.notifications().updateStatusItem(STATUS_ID, "Opened " + event.path().getFileName())
         );
         workspaceSubscription = context.events().subscribe(WorkspaceChangedEvent.class, event -> setRootPath(event.workspace()));
         setRootPath(initialRoot());
@@ -55,9 +56,10 @@ public final class FileTreePlugin implements Plugin {
             workspaceSubscription.close();
         }
         if (context != null) {
-            context.ui().removeMenuAction(REFRESH_ID);
-            context.ui().removeToolPanel(PANEL_ID);
-            context.ui().removeStatusItem(STATUS_ID);
+            context.commands().removeMenuItem(REFRESH_ID);
+            context.commands().unregisterCommand(REFRESH_ID);
+            context.panels().removePanel(PANEL_ID);
+            context.notifications().removeStatusItem(STATUS_ID);
         }
     }
 
@@ -124,7 +126,7 @@ public final class FileTreePlugin implements Plugin {
         Path normalized = root.toAbsolutePath().normalize();
         rootLabel.setText(normalized.toString());
         treeView.setRoot(new LazyPathItem(normalized));
-        context.ui().updateStatusItem(STATUS_ID, "Files " + normalized.getFileName());
+        context.notifications().updateStatusItem(STATUS_ID, "Files " + normalized.getFileName());
     }
 
     private void openSelectedFile() {
@@ -133,7 +135,7 @@ public final class FileTreePlugin implements Plugin {
             return;
         }
         context.editor().openFile(item.getValue());
-        context.ui().updateStatusItem(STATUS_ID, "Opened " + item.getValue().getFileName());
+        context.notifications().updateStatusItem(STATUS_ID, "Opened " + item.getValue().getFileName());
     }
 
     private Path initialRoot() {

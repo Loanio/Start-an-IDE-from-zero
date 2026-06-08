@@ -148,6 +148,10 @@
     -fx-background-color: #1f1f1f;
 }
 
+.workspace-body-split {
+    -fx-background-color: #1f1f1f;
+}
+
 .side-panel-header {
     -fx-alignment: center-left;
     -fx-spacing: 8;
@@ -248,6 +252,128 @@
     -fx-border-width: 0 0 0 1;
 }
 
+.bottom-panel-host {
+    -fx-background-color: #1f1f1f;
+    -fx-border-color: #303030;
+    -fx-border-width: 1 0 0 0;
+}
+
+.bottom-panel-header {
+    -fx-background-color: #181818;
+    -fx-border-color: #2a2a2a;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 0 8;
+    -fx-alignment: center-left;
+    -fx-spacing: 8;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+}
+
+.bottom-tabs {
+    -fx-background-color: #1f1f1f;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+.bottom-tabs .tab-content-area,
+.bottom-tabs .tab-content-area StackPane {
+    -fx-background-color: #1f1f1f;
+}
+
+.bottom-tabs .text-area,
+.bottom-tabs .text-area .scroll-pane,
+.bottom-tabs .text-area .scroll-pane .viewport,
+.bottom-tabs .text-area .scroll-pane .content,
+.bottom-tabs .text-area .content {
+    -fx-background-color: #171717;
+    -fx-control-inner-background: #171717;
+    -fx-text-fill: #d4d4d4;
+}
+
+.bottom-tabs .tab-header-area {
+    -fx-padding: 0;
+}
+
+.bottom-tabs .tab-header-area .tab-header-background {
+    -fx-background-color: #181818;
+    -fx-border-color: #2a2a2a;
+    -fx-border-width: 0 0 1 0;
+}
+
+.bottom-tabs .tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-padding: 6 12 5 12;
+}
+
+.bottom-tabs .tab:hover {
+    -fx-background-color: #242424;
+}
+
+.bottom-tabs .tab:selected {
+    -fx-background-color: #1f1f1f;
+    -fx-border-color: #4ec9b0;
+    -fx-border-width: 0 0 2 0;
+}
+
+.bottom-tabs .tab .tab-label {
+    -fx-text-fill: #a8a8a8;
+    -fx-font-size: 12px;
+}
+
+.bottom-tabs .tab:selected .tab-label {
+    -fx-text-fill: #f3f3f3;
+}
+
+.collapsed-bottom-rail {
+    -fx-background-color: #181818;
+    -fx-border-color: #2a2a2a;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 4 8;
+    -fx-min-height: 34;
+    -fx-pref-height: 34;
+}
+
+.collapsed-bottom-rail-accent {
+    -fx-background-color: #4ec9b0;
+    -fx-background-radius: 2;
+    -fx-min-width: 2;
+    -fx-pref-width: 2;
+    -fx-max-width: 2;
+    -fx-min-height: 20;
+    -fx-pref-height: 20;
+    -fx-max-height: 20;
+}
+
+.collapsed-bottom-rail-label {
+    -fx-text-fill: #858585;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.collapsed-bottom-rail-button {
+    -fx-background-color: #242424;
+    -fx-border-color: #333333;
+    -fx-text-fill: #dcdcdc;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+    -fx-min-width: 30;
+    -fx-pref-width: 30;
+    -fx-max-width: 30;
+    -fx-min-height: 24;
+    -fx-pref-height: 24;
+    -fx-padding: 0;
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 14px;
+}
+
+.collapsed-bottom-rail-button:hover {
+    -fx-background-color: #2a2d2e;
+    -fx-border-color: #4ec9b0;
+    -fx-text-fill: #ffffff;
+}
+
 .sidebar {
     -fx-background-color: #252525;
     -fx-padding: 12;
@@ -289,6 +415,53 @@
 .plugin-list .list-cell:selected {
     -fx-background-color: #04395e;
     -fx-text-fill: #ffffff;
+}
+
+.sidebar-tabs {
+    -fx-background-color: #1f1f1f;
+    -fx-border-color: #303030;
+    -fx-border-radius: 2;
+    -fx-background-radius: 2;
+}
+
+.sidebar-tabs .tab-header-area {
+    -fx-padding: 0;
+}
+
+.sidebar-tabs .tab-header-area .tab-header-background {
+    -fx-background-color: #1b1b1b;
+    -fx-border-color: #2a2a2a;
+    -fx-border-width: 0 0 1 0;
+}
+
+.sidebar-tabs .tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-padding: 5 9 4 9;
+}
+
+.sidebar-tabs .tab:hover {
+    -fx-background-color: #242424;
+}
+
+.sidebar-tabs .tab:selected {
+    -fx-background-color: #1f1f1f;
+    -fx-border-color: #569cd6;
+    -fx-border-width: 0 0 2 0;
+}
+
+.sidebar-tabs .tab .tab-label {
+    -fx-text-fill: #a8a8a8;
+    -fx-font-size: 11px;
+}
+
+.sidebar-tabs .tab:selected .tab-label {
+    -fx-text-fill: #f3f3f3;
+}
+
+.sidebar-tabs .tab-content-area,
+.sidebar-tabs .tab-content-area StackPane {
+    -fx-background-color: #1f1f1f;
 }
 
 .plugin-actions .button {
@@ -495,10 +668,29 @@
 }
 
 .plugin-output {
+    -fx-background-color: #171717;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-control-inner-background: #171717;
+    -fx-text-fill: #d4d4d4;
+    -fx-prompt-text-fill: #6f6f6f;
     -fx-font-family: "Cascadia Mono", "Consolas", monospace;
     -fx-font-size: 12px;
     -fx-highlight-fill: #264f78;
     -fx-highlight-text-fill: #ffffff;
+}
+
+.plugin-output .scroll-pane,
+.plugin-output .scroll-pane .viewport,
+.plugin-output .scroll-pane .content,
+.plugin-output .content {
+    -fx-background-color: #171717;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.plugin-output .text {
+    -fx-fill: #d4d4d4;
 }
 
 .file-row,

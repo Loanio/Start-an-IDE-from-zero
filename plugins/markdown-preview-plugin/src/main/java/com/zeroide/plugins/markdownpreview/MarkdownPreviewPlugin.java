@@ -28,9 +28,10 @@ public final class MarkdownPreviewPlugin implements Plugin {
     @Override
     public void onLoad(EditorContext context) {
         this.context = context;
-        context.ui().addStatusItem(STATUS_ID, "Markdown preview");
-        context.ui().addMenuAction("Markdown", REFRESH_ID, "Refresh Preview", this::render);
-        context.ui().addToolPanel(PANEL_ID, "Preview", buildPanel());
+        context.notifications().addStatusItem(STATUS_ID, "Markdown preview");
+        context.commands().registerCommand(REFRESH_ID, "Refresh Preview", this::render);
+        context.commands().addMenuItem("Markdown", REFRESH_ID, REFRESH_ID);
+        context.panels().addToolPanel(PANEL_ID, "Preview", buildPanel());
         textSubscription = context.events().subscribe(TextChangedEvent.class, ignored -> render());
         fileSubscription = context.events().subscribe(FileOpenedEvent.class, ignored -> render());
         render();
@@ -45,9 +46,10 @@ public final class MarkdownPreviewPlugin implements Plugin {
             fileSubscription.close();
         }
         if (context != null) {
-            context.ui().removeMenuAction(REFRESH_ID);
-            context.ui().removeToolPanel(PANEL_ID);
-            context.ui().removeStatusItem(STATUS_ID);
+            context.commands().removeMenuItem(REFRESH_ID);
+            context.commands().unregisterCommand(REFRESH_ID);
+            context.panels().removePanel(PANEL_ID);
+            context.notifications().removeStatusItem(STATUS_ID);
         }
     }
 
@@ -121,7 +123,7 @@ public final class MarkdownPreviewPlugin implements Plugin {
         }
 
         blockCountLabel.setText(previewContent.getChildren().size() + " blocks");
-        context.ui().updateStatusItem(STATUS_ID, previewContent.getChildren().size() + " blocks");
+        context.notifications().updateStatusItem(STATUS_ID, previewContent.getChildren().size() + " blocks");
     }
 
     private static Node renderLine(String line) {

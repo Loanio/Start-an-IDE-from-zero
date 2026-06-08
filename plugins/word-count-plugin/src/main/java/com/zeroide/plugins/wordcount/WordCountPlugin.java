@@ -14,9 +14,9 @@ public final class WordCountPlugin implements Plugin {
     @Override
     public void onLoad(EditorContext context) {
         this.context = context;
-        context.ui().addStatusItem(STATUS_ID, format(context.editor().getText()));
+        context.notifications().addStatusItem(STATUS_ID, format(context.editor().getText()));
         textSubscription = context.events().subscribe(TextChangedEvent.class, event ->
-                context.ui().updateStatusItem(STATUS_ID, format(event.text()))
+                context.notifications().updateStatusItem(STATUS_ID, format(event.text()))
         );
     }
 
@@ -26,7 +26,7 @@ public final class WordCountPlugin implements Plugin {
             textSubscription.close();
         }
         if (context != null) {
-            context.ui().removeStatusItem(STATUS_ID);
+            context.notifications().removeStatusItem(STATUS_ID);
         }
     }
 

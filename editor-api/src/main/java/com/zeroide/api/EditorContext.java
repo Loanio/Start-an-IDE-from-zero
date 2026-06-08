@@ -8,4 +8,10 @@ public interface EditorContext {
     UIService ui();
 
     WorkspaceService workspace();
+
+    PanelService panels();
+
+    CommandService commands();
+
+    NotificationService notifications();
 }

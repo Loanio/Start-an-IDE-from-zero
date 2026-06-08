@@ -16,20 +16,22 @@ public final class JavaSnippetsPlugin implements Plugin {
     @Override
     public void onLoad(EditorContext context) {
         this.context = context;
-        context.ui().addStatusItem(STATUS_ID, "Java snippets");
-        context.ui().addMenuAction("Java", SOUT_ID, "Insert println", () ->
+        context.notifications().addStatusItem(STATUS_ID, "Java snippets");
+        context.commands().registerCommand(SOUT_ID, "Insert println", () ->
                 context.editor().insertText("System.out.println(\"\");")
         );
-        context.ui().addMenuAction("Java", MAIN_ID, "Insert main method", () ->
+        context.commands().registerCommand(MAIN_ID, "Insert main method", () ->
                 context.editor().insertText("""
                         public static void main(String[] args) {
                             System.out.println("");
                         }
                         """)
         );
+        context.commands().addMenuItem("Java", SOUT_ID, SOUT_ID);
+        context.commands().addMenuItem("Java", MAIN_ID, MAIN_ID);
         fileSubscription = context.events().subscribe(FileOpenedEvent.class, event -> {
             if (event.path().getFileName().toString().endsWith(".java")) {
-                context.ui().updateStatusItem(STATUS_ID, "Java file");
+                context.notifications().updateStatusItem(STATUS_ID, "Java file");
             }
         });
     }
@@ -40,9 +42,11 @@ public final class JavaSnippetsPlugin implements Plugin {
             fileSubscription.close();
         }
         if (context != null) {
-            context.ui().removeMenuAction(SOUT_ID);
-            context.ui().removeMenuAction(MAIN_ID);
-            context.ui().removeStatusItem(STATUS_ID);
+            context.commands().removeMenuItem(SOUT_ID);
+            context.commands().removeMenuItem(MAIN_ID);
+            context.commands().unregisterCommand(SOUT_ID);
+            context.commands().unregisterCommand(MAIN_ID);
+            context.notifications().removeStatusItem(STATUS_ID);
         }
     }
 }

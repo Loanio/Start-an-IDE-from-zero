@@ -29,6 +29,8 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCombination;
@@ -54,11 +56,15 @@ public final class ZeroIdeApp extends Application {
     private Label projectNameLabel;
     private Label metricsLabel;
     private ListView<LoadedPlugin> pluginList;
+    private TabPane sidebarPanelTabs;
     private TabPane toolPanelTabs;
+    private TabPane bottomPanelTabs;
     private BorderPane workspaceShell;
+    private SplitPane workspaceBodySplitPane;
     private SplitPane workspaceSplitPane;
     private VBox sidebar;
     private BorderPane toolPanelHost;
+    private BorderPane bottomPanelHost;
     private CoreContainer container;
     private DynamicPluginManager pluginManager;
     private JavaFxEditorService editorService;
@@ -67,8 +73,10 @@ public final class ZeroIdeApp extends Application {
     private Menu recentWorkspacesMenu;
     private boolean sidebarVisible = true;
     private boolean toolPanelVisible = true;
+    private boolean bottomPanelVisible = true;
     private double sidebarDividerPosition = 0.22;
     private double toolPanelDividerPosition = 0.72;
+    private double bottomDividerPosition = 0.68;
     private double dragOffsetX;
     private double dragOffsetY;
 
@@ -84,10 +92,12 @@ public final class ZeroIdeApp extends Application {
         editor = buildEditor();
         HBox statusBar = buildStatusBar();
         pluginList = buildPluginList();
+        sidebarPanelTabs = buildSidebarPanelTabs();
         toolPanelTabs = buildToolPanelTabs();
+        bottomPanelTabs = buildBottomPanelTabs();
 
         Path pluginDirectory = resolvePluginDirectory();
-        container = CoreContainer.create(editor, menuBar, statusBar, toolPanelTabs, stage, pluginDirectory);
+        container = CoreContainer.create(editor, menuBar, statusBar, sidebarPanelTabs, toolPanelTabs, bottomPanelTabs, stage, pluginDirectory);
         pluginManager = container.getBean(DynamicPluginManager.class);
         editorService = (JavaFxEditorService) container.getBean(EditorService.class);
         workspaceService = container.getBean(WorkspaceService.class);
@@ -226,11 +236,14 @@ public final class ZeroIdeApp extends Application {
 
         sidebar = buildSidebar();
         toolPanelHost = buildToolPanelHost();
+        bottomPanelHost = buildBottomPanelHost();
         workspaceSplitPane = new SplitPane();
         workspaceSplitPane.getStyleClass().add("workspace-split");
+        workspaceBodySplitPane = new SplitPane();
+        workspaceBodySplitPane.setOrientation(Orientation.VERTICAL);
+        workspaceBodySplitPane.getStyleClass().add("workspace-body-split");
 
         updateWorkspacePanels();
-        workspaceShell.setCenter(workspaceSplitPane);
         return workspaceShell;
     }
 
@@ -258,6 +271,57 @@ public final class ZeroIdeApp extends Application {
         tabs.setMinWidth(300);
         tabs.setPrefWidth(360);
         return tabs;
+    }
+
+    private TabPane buildSidebarPanelTabs() {
+        TabPane tabs = new TabPane();
+        tabs.getStyleClass().add("sidebar-tabs");
+        tabs.setMinHeight(220);
+        return tabs;
+    }
+
+    private BorderPane buildBottomPanelHost() {
+        Label title = new Label("PANEL");
+        title.getStyleClass().add("side-panel-title");
+
+        Button collapse = sideToggleButton("v", "Hide bottom panel");
+        collapse.getStyleClass().add("side-collapse-button");
+        collapse.setOnAction(ignored -> toggleBottomPanel());
+
+        HBox header = new HBox(title, spacer(), collapse);
+        header.getStyleClass().add("bottom-panel-header");
+
+        BorderPane host = new BorderPane();
+        host.getStyleClass().add("bottom-panel-host");
+        host.setTop(header);
+        host.setCenter(bottomPanelTabs);
+        return host;
+    }
+
+    private TabPane buildBottomPanelTabs() {
+        TabPane tabs = new TabPane();
+        tabs.getStyleClass().add("bottom-tabs");
+        tabs.setMinHeight(160);
+        tabs.setPrefHeight(230);
+        tabs.getTabs().addAll(
+                fixedTab("Problems", defaultPanelText("No problems detected.")),
+                fixedTab("Output", defaultPanelText("No output yet."))
+        );
+        return tabs;
+    }
+
+    private Tab fixedTab(String title, Node content) {
+        Tab tab = new Tab(title, content);
+        tab.setClosable(false);
+        return tab;
+    }
+
+    private TextArea defaultPanelText(String text) {
+        TextArea output = new TextArea(text);
+        output.setEditable(false);
+        output.setWrapText(true);
+        output.getStyleClass().add("plugin-output");
+        return output;
     }
 
     private VBox buildSidebar() {
@@ -297,8 +361,9 @@ public final class ZeroIdeApp extends Application {
         HBox.setHgrow(unloadButton, Priority.ALWAYS);
         HBox.setHgrow(refreshButton, Priority.ALWAYS);
 
-        VBox sidebar = new VBox(10, explorerHeader, projectNameLabel, new Separator(Orientation.HORIZONTAL), pluginTitle, pluginList, pluginActions);
+        VBox sidebar = new VBox(10, explorerHeader, projectNameLabel, sidebarPanelTabs, new Separator(Orientation.HORIZONTAL), pluginTitle, pluginList, pluginActions);
         sidebar.getStyleClass().add("sidebar");
+        VBox.setVgrow(sidebarPanelTabs, Priority.ALWAYS);
         VBox.setVgrow(pluginList, Priority.ALWAYS);
         return sidebar;
     }
@@ -369,7 +434,8 @@ public final class ZeroIdeApp extends Application {
         Menu viewMenu = new Menu("View");
         MenuItem toggleSidebar = item("Toggle Sidebar", "Shortcut+B", ignored -> toggleSidebar());
         MenuItem toggleTools = item("Toggle Tools", "Shortcut+Shift+B", ignored -> toggleToolPanel());
-        viewMenu.getItems().addAll(toggleSidebar, toggleTools);
+        MenuItem togglePanel = item("Toggle Bottom Panel", "Shortcut+J", ignored -> toggleBottomPanel());
+        viewMenu.getItems().addAll(toggleSidebar, toggleTools, togglePanel);
 
         menuBar.getMenus().addAll(fileMenu, viewMenu, pluginMenu);
     }
@@ -515,6 +581,12 @@ public final class ZeroIdeApp extends Application {
         updateWorkspacePanels();
     }
 
+    private void toggleBottomPanel() {
+        rememberDividerPositions();
+        bottomPanelVisible = !bottomPanelVisible;
+        updateWorkspacePanels();
+    }
+
     private void updateWorkspacePanels() {
         if (workspaceSplitPane == null) {
             return;
@@ -523,6 +595,7 @@ public final class ZeroIdeApp extends Application {
         workspaceSplitPane.getItems().setAll(workspaceItems());
         workspaceShell.setLeft(sidebarVisible ? null : collapsedRail("FILES", ">", "Show left sidebar", this::toggleSidebar, "left-rail"));
         workspaceShell.setRight(toolPanelVisible ? null : collapsedRail("TOOLS", "<", "Show right tools", this::toggleToolPanel, "right-rail"));
+        workspaceShell.setBottom(bottomPanelVisible ? null : collapsedBottomRail());
 
         if (sidebarVisible && toolPanelVisible) {
             workspaceSplitPane.setDividerPositions(sidebarDividerPosition, toolPanelDividerPosition);
@@ -530,6 +603,16 @@ public final class ZeroIdeApp extends Application {
             workspaceSplitPane.setDividerPositions(sidebarDividerPosition);
         } else if (toolPanelVisible) {
             workspaceSplitPane.setDividerPositions(toolPanelDividerPosition);
+        }
+
+        if (workspaceBodySplitPane != null) {
+            if (bottomPanelVisible) {
+                workspaceBodySplitPane.getItems().setAll(workspaceSplitPane, bottomPanelHost);
+                workspaceBodySplitPane.setDividerPositions(bottomDividerPosition);
+            } else {
+                workspaceBodySplitPane.getItems().setAll(workspaceSplitPane);
+            }
+            workspaceShell.setCenter(workspaceBodySplitPane);
         }
     }
 
@@ -546,6 +629,13 @@ public final class ZeroIdeApp extends Application {
             sidebarDividerPosition = clampDivider(positions[0]);
         } else if (positions.length == 1 && toolPanelVisible) {
             toolPanelDividerPosition = clampDivider(positions[0]);
+        }
+
+        if (workspaceBodySplitPane != null && bottomPanelVisible) {
+            double[] bodyPositions = workspaceBodySplitPane.getDividerPositions();
+            if (bodyPositions.length == 1) {
+                bottomDividerPosition = clampBottomDivider(bodyPositions[0]);
+            }
         }
     }
 
@@ -579,6 +669,23 @@ public final class ZeroIdeApp extends Application {
         return rail;
     }
 
+    private HBox collapsedBottomRail() {
+        Region accent = new Region();
+        accent.getStyleClass().add("collapsed-bottom-rail-accent");
+
+        Label label = new Label("PANEL");
+        label.getStyleClass().add("collapsed-bottom-rail-label");
+
+        Button button = sideToggleButton("^", "Show bottom panel");
+        button.getStyleClass().add("collapsed-bottom-rail-button");
+        button.setOnAction(ignored -> toggleBottomPanel());
+
+        HBox rail = new HBox(8, accent, label, spacer(), button);
+        rail.getStyleClass().add("collapsed-bottom-rail");
+        rail.setAlignment(Pos.CENTER_LEFT);
+        return rail;
+    }
+
     private Button sideToggleButton(String text, String tooltip) {
         Button button = new Button(text);
         button.getStyleClass().add("side-toggle-button");
@@ -595,5 +702,9 @@ public final class ZeroIdeApp extends Application {
 
     private static double clampDivider(double position) {
         return Math.max(0.12, Math.min(0.88, position));
+    }
+
+    private static double clampBottomDivider(double position) {
+        return Math.max(0.45, Math.min(0.86, position));
     }
 }

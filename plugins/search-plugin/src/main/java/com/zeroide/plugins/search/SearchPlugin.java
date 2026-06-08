@@ -44,10 +44,12 @@ public final class SearchPlugin implements Plugin {
     @Override
     public void onLoad(EditorContext context) {
         this.context = context;
-        context.ui().addStatusItem(STATUS_ID, "Search ready");
-        context.ui().addMenuAction("Search", SEARCH_ID, "Search Current File", this::search);
-        context.ui().addMenuAction("Search", WORKSPACE_SEARCH_ID, "Search Workspace", this::searchWorkspace);
-        context.ui().addToolPanel(PANEL_ID, "Search", buildPanel());
+        context.notifications().addStatusItem(STATUS_ID, "Search ready");
+        context.commands().registerCommand(SEARCH_ID, "Search Current File", this::search);
+        context.commands().registerCommand(WORKSPACE_SEARCH_ID, "Search Workspace", this::searchWorkspace);
+        context.commands().addMenuItem("Search", SEARCH_ID, SEARCH_ID);
+        context.commands().addMenuItem("Search", WORKSPACE_SEARCH_ID, WORKSPACE_SEARCH_ID);
+        context.panels().addToolPanel(PANEL_ID, "Search", buildPanel());
         textSubscription = context.events().subscribe(TextChangedEvent.class, ignored -> search());
         workspaceSubscription = context.events().subscribe(WorkspaceChangedEvent.class, ignored -> updateScopeLabel());
     }
@@ -61,10 +63,12 @@ public final class SearchPlugin implements Plugin {
             workspaceSubscription.close();
         }
         if (context != null) {
-            context.ui().removeMenuAction(SEARCH_ID);
-            context.ui().removeMenuAction(WORKSPACE_SEARCH_ID);
-            context.ui().removeToolPanel(PANEL_ID);
-            context.ui().removeStatusItem(STATUS_ID);
+            context.commands().removeMenuItem(SEARCH_ID);
+            context.commands().removeMenuItem(WORKSPACE_SEARCH_ID);
+            context.commands().unregisterCommand(SEARCH_ID);
+            context.commands().unregisterCommand(WORKSPACE_SEARCH_ID);
+            context.panels().removePanel(PANEL_ID);
+            context.notifications().removeStatusItem(STATUS_ID);
         }
     }
 
@@ -146,14 +150,14 @@ public final class SearchPlugin implements Plugin {
         if (query == null || query.isEmpty()) {
             results.setItems(FXCollections.observableArrayList());
             countLabel.setText("0 matches");
-            context.ui().updateStatusItem(STATUS_ID, "Search ready");
+            context.notifications().updateStatusItem(STATUS_ID, "Search ready");
             return;
         }
 
         List<SearchHit> hits = findHits(null, context.editor().getText(), query, caseSensitive.isSelected());
         results.setItems(FXCollections.observableArrayList(hits));
         countLabel.setText(hits.size() + " matches");
-        context.ui().updateStatusItem(STATUS_ID, hits.size() + " matches");
+        context.notifications().updateStatusItem(STATUS_ID, hits.size() + " matches");
     }
 
     private void replaceAll() {
@@ -166,7 +170,7 @@ public final class SearchPlugin implements Plugin {
         List<SearchHit> hits = findHits(null, text, query, caseSensitive.isSelected());
         int matches = hits.size();
         context.editor().replaceText(replace(text, hits, replacement));
-        context.ui().updateStatusItem(STATUS_ID, "Replaced " + matches);
+        context.notifications().updateStatusItem(STATUS_ID, "Replaced " + matches);
     }
 
     private void clear() {
@@ -174,7 +178,7 @@ public final class SearchPlugin implements Plugin {
         replacementField.clear();
         results.setItems(FXCollections.observableArrayList());
         countLabel.setText("0 matches");
-        context.ui().updateStatusItem(STATUS_ID, "Search ready");
+        context.notifications().updateStatusItem(STATUS_ID, "Search ready");
     }
 
     private void selectCurrentHit() {
@@ -199,7 +203,7 @@ public final class SearchPlugin implements Plugin {
 
         Path workspace = context.workspace().getWorkspace().orElse(null);
         if (workspace == null) {
-            context.ui().updateStatusItem(STATUS_ID, "No workspace");
+            context.notifications().updateStatusItem(STATUS_ID, "No workspace");
             return;
         }
 
@@ -210,13 +214,13 @@ public final class SearchPlugin implements Plugin {
                     .takeWhile(ignored -> hits.size() < MAX_WORKSPACE_HITS)
                     .forEach(path -> addWorkspaceHits(hits, path, query));
         } catch (IOException ex) {
-            context.ui().updateStatusItem(STATUS_ID, "Workspace search failed");
+            context.notifications().updateStatusItem(STATUS_ID, "Workspace search failed");
             return;
         }
 
         results.setItems(FXCollections.observableArrayList(hits));
         countLabel.setText(hits.size() + " matches");
-        context.ui().updateStatusItem(STATUS_ID, hits.size() + " workspace matches");
+        context.notifications().updateStatusItem(STATUS_ID, hits.size() + " workspace matches");
     }
 
     private void addWorkspaceHits(List<SearchHit> hits, Path path, String query) {

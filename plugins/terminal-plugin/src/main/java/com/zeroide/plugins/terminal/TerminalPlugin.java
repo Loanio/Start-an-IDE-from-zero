@@ -39,9 +39,10 @@ public final class TerminalPlugin implements Plugin {
     @Override
     public void onLoad(EditorContext context) {
         this.context = context;
-        context.ui().addStatusItem(STATUS_ID, "Terminal ready");
-        context.ui().addMenuAction("Terminal", CLEAR_ID, "Clear Terminal", this::clear);
-        context.ui().addToolPanel(PANEL_ID, "Terminal", buildPanel());
+        context.notifications().addStatusItem(STATUS_ID, "Terminal ready");
+        context.commands().registerCommand(CLEAR_ID, "Clear Terminal", this::clear);
+        context.commands().addMenuItem("Terminal", CLEAR_ID, CLEAR_ID);
+        context.panels().addBottomPanel(PANEL_ID, "Terminal", buildPanel());
         workspaceSubscription = context.events().subscribe(WorkspaceChangedEvent.class, ignored -> updateCwdLabel());
     }
 
@@ -51,9 +52,10 @@ public final class TerminalPlugin implements Plugin {
             workspaceSubscription.close();
         }
         if (context != null) {
-            context.ui().removeMenuAction(CLEAR_ID);
-            context.ui().removeToolPanel(PANEL_ID);
-            context.ui().removeStatusItem(STATUS_ID);
+            context.commands().removeMenuItem(CLEAR_ID);
+            context.commands().unregisterCommand(CLEAR_ID);
+            context.panels().removePanel(PANEL_ID);
+            context.notifications().removeStatusItem(STATUS_ID);
         }
     }
 
@@ -115,7 +117,7 @@ public final class TerminalPlugin implements Plugin {
         remember(command);
         commandField.clear();
         append(System.lineSeparator() + workingDirectory + System.lineSeparator() + "$ " + command + System.lineSeparator());
-        context.ui().updateStatusItem(STATUS_ID, "Terminal running");
+        context.notifications().updateStatusItem(STATUS_ID, "Terminal running");
 
         Thread worker = new Thread(() -> {
             List<String> shellCommand = shellCommand(command);
@@ -132,14 +134,14 @@ public final class TerminalPlugin implements Plugin {
                 }
                 int exitCode = process.waitFor();
                 append("[exit " + exitCode + "]" + System.lineSeparator());
-                context.ui().updateStatusItem(STATUS_ID, "Terminal done");
+                context.notifications().updateStatusItem(STATUS_ID, "Terminal done");
             } catch (IOException ex) {
                 append("Cannot run command: " + ex.getMessage() + System.lineSeparator());
-                context.ui().updateStatusItem(STATUS_ID, "Terminal error");
+                context.notifications().updateStatusItem(STATUS_ID, "Terminal error");
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 append("Command interrupted." + System.lineSeparator());
-                context.ui().updateStatusItem(STATUS_ID, "Terminal interrupted");
+                context.notifications().updateStatusItem(STATUS_ID, "Terminal interrupted");
             }
         }, "zero-ide-terminal-plugin");
         worker.setDaemon(true);

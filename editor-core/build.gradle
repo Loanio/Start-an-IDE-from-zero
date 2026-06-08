@@ -21,7 +21,13 @@ application {
     mainClass = "com.zeroide.core.ZeroIdeApp"
 }
 
+def zeroIdeJvmArgs = ["--enable-native-access=javafx.graphics"]
+if (JavaVersion.current().majorVersion.toInteger() >= 24) {
+    zeroIdeJvmArgs.add("--sun-misc-unsafe-memory-access=allow")
+}
+
 tasks.named("run") {
     dependsOn rootProject.tasks.named("copyRuntimePlugins")
     systemProperty "zeroide.pluginDir", rootProject.layout.buildDirectory.dir("runtime/plugins").get().asFile.absolutePath
+    jvmArgs zeroIdeJvmArgs
 }
