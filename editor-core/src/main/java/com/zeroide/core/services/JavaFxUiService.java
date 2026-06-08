@@ -1,9 +1,11 @@
 package com.zeroide.core.services;
 
+import com.zeroide.api.CommandDescriptor;
 import com.zeroide.api.NotificationLevel;
 import com.zeroide.api.PanelLocation;
 import com.zeroide.api.UIService;
 import javafx.application.Platform;
+import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
@@ -11,9 +13,12 @@ import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.HBox;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class JavaFxUiService implements UIService {
@@ -28,6 +33,7 @@ public final class JavaFxUiService implements UIService {
     private final Map<String, Tab> sidebarPanelItems = new LinkedHashMap<>();
     private final Map<String, Tab> panelItems = new LinkedHashMap<>();
     private final Map<String, Tab> bottomPanelItems = new LinkedHashMap<>();
+    private Scene scene;
 
     public JavaFxUiService(MenuBar menuBar, HBox statusBar, TabPane sidebarPanels, TabPane toolPanels, TabPane bottomPanels) {
         this.menuBar = menuBar;
@@ -85,14 +91,22 @@ public final class JavaFxUiService implements UIService {
 
     @Override
     public void registerCommand(String id, String title, Runnable action) {
+        registerCommand(id, title, null, action);
+    }
+
+    @Override
+    public void registerCommand(String id, String title, String keyBinding, Runnable action) {
         if (id == null || id.isBlank() || action == null) {
             return;
         }
-        commands.put(id, new RegisteredCommand(title == null ? id : title, action));
+        removeAccelerator(id);
+        commands.put(id, new RegisteredCommand(id, title == null ? id : title, keyBinding, action));
+        installAccelerator(id);
     }
 
     @Override
     public void unregisterCommand(String id) {
+        removeAccelerator(id);
         commands.remove(id);
     }
 
@@ -102,6 +116,14 @@ public final class JavaFxUiService implements UIService {
         if (command != null) {
             command.action().run();
         }
+    }
+
+    @Override
+    public List<CommandDescriptor> commands() {
+        return commands.values().stream()
+                .map(command -> new CommandDescriptor(command.id(), command.title(), command.keyBinding()))
+                .sorted(Comparator.comparing(CommandDescriptor::title, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
     @Override
@@ -130,6 +152,11 @@ public final class JavaFxUiService implements UIService {
                 }
             }
         });
+    }
+
+    public void attachScene(Scene scene) {
+        this.scene = scene;
+        commands.keySet().forEach(this::installAccelerator);
     }
 
     @Override
@@ -249,6 +276,31 @@ public final class JavaFxUiService implements UIService {
         }
     }
 
-    private record RegisteredCommand(String title, Runnable action) {
+    private void installAccelerator(String commandId) {
+        if (scene == null) {
+            return;
+        }
+        RegisteredCommand command = commands.get(commandId);
+        if (command == null || command.keyBinding() == null || command.keyBinding().isBlank()) {
+            return;
+        }
+        runOnFxThread(() -> scene.getAccelerators().put(
+                KeyCombination.keyCombination(command.keyBinding()),
+                () -> executeCommand(commandId)
+        ));
+    }
+
+    private void removeAccelerator(String commandId) {
+        if (scene == null) {
+            return;
+        }
+        RegisteredCommand command = commands.get(commandId);
+        if (command == null || command.keyBinding() == null || command.keyBinding().isBlank()) {
+            return;
+        }
+        runOnFxThread(() -> scene.getAccelerators().remove(KeyCombination.keyCombination(command.keyBinding())));
+    }
+
+    private record RegisteredCommand(String id, String title, String keyBinding, Runnable action) {
     }
 }

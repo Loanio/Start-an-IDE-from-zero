@@ -3,6 +3,8 @@ package com.zeroide.core;
 import com.zeroide.api.EditorService;
 import com.zeroide.api.Subscription;
 import com.zeroide.api.WorkspaceService;
+import com.zeroide.api.CommandDescriptor;
+import com.zeroide.api.CommandService;
 import com.zeroide.api.events.TextChangedEvent;
 import com.zeroide.api.events.WorkspaceChangedEvent;
 import com.zeroide.core.editor.RichCodeEditor;
@@ -31,8 +33,10 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
+import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -48,6 +52,7 @@ import javafx.stage.StageStyle;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 
 public final class ZeroIdeApp extends Application {
     private RichCodeEditor editor;
@@ -69,8 +74,13 @@ public final class ZeroIdeApp extends Application {
     private DynamicPluginManager pluginManager;
     private JavaFxEditorService editorService;
     private WorkspaceService workspaceService;
+    private CommandService commandService;
     private Subscription workspaceSubscription;
     private Menu recentWorkspacesMenu;
+    private StackPane appRoot;
+    private VBox commandPalette;
+    private TextField commandPaletteInput;
+    private ListView<CommandDescriptor> commandPaletteList;
     private boolean sidebarVisible = true;
     private boolean toolPanelVisible = true;
     private boolean bottomPanelVisible = true;
@@ -101,7 +111,9 @@ public final class ZeroIdeApp extends Application {
         pluginManager = container.getBean(DynamicPluginManager.class);
         editorService = (JavaFxEditorService) container.getBean(EditorService.class);
         workspaceService = container.getBean(WorkspaceService.class);
+        commandService = container.getBean(CommandService.class);
 
+        configureCoreCommands(stage);
         configureMenus(menuBar, stage);
         configureEditorEvents();
         configureWorkspaceEvents();
@@ -114,13 +126,18 @@ public final class ZeroIdeApp extends Application {
         root.setCenter(buildWorkspace());
         root.setBottom(statusBar);
 
-        Scene scene = new Scene(root, 1180, 760);
+        appRoot = new StackPane(root, buildCommandPalette());
+        commandPalette.setVisible(false);
+        commandPalette.setManaged(false);
+
+        Scene scene = new Scene(appRoot, 1180, 760);
         scene.setFill(Color.web("#1e1e1e"));
         scene.getStylesheets().add(getClass().getResource("/styles/app.css").toExternalForm());
 
         stage.setTitle("Zero IDE");
         configureWindowIcon(stage);
         stage.setScene(scene);
+        container.getBean(com.zeroide.core.services.JavaFxUiService.class).attachScene(scene);
         stage.show();
 
         pluginManager.loadAll();
@@ -324,6 +341,127 @@ public final class ZeroIdeApp extends Application {
         return output;
     }
 
+    private VBox buildCommandPalette() {
+        Label title = new Label("Command Palette");
+        title.getStyleClass().add("command-palette-title");
+
+        commandPaletteInput = new TextField();
+        commandPaletteInput.getStyleClass().add("command-palette-input");
+        commandPaletteInput.setPromptText("Type a command");
+        commandPaletteInput.textProperty().addListener((ignored, oldValue, newValue) -> refreshCommandPalette());
+        commandPaletteInput.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                hideCommandPalette();
+                event.consume();
+            } else if (event.getCode() == KeyCode.ENTER) {
+                executeSelectedCommand();
+                event.consume();
+            } else if (event.getCode() == KeyCode.DOWN) {
+                moveCommandSelection(1);
+                event.consume();
+            } else if (event.getCode() == KeyCode.UP) {
+                moveCommandSelection(-1);
+                event.consume();
+            }
+        });
+
+        commandPaletteList = new ListView<>();
+        commandPaletteList.getStyleClass().add("command-palette-list");
+        commandPaletteList.setCellFactory(ignored -> new ListCell<>() {
+            @Override
+            protected void updateItem(CommandDescriptor command, boolean empty) {
+                super.updateItem(command, empty);
+                if (empty || command == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                Label name = new Label(command.title());
+                name.getStyleClass().add("command-palette-command-title");
+                Label meta = new Label(command.keyBinding().map(binding -> command.id() + "  " + binding).orElse(command.id()));
+                meta.getStyleClass().add("command-palette-command-meta");
+                VBox row = new VBox(2, name, meta);
+                row.getStyleClass().add("command-palette-command");
+                setText(null);
+                setGraphic(row);
+            }
+        });
+        commandPaletteList.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                executeSelectedCommand();
+            }
+        });
+
+        VBox palette = new VBox(8, title, commandPaletteInput, commandPaletteList);
+        palette.getStyleClass().add("command-palette");
+        palette.setMaxWidth(620);
+        palette.setMaxHeight(420);
+        StackPane.setAlignment(palette, Pos.TOP_CENTER);
+        StackPane.setMargin(palette, new Insets(74, 0, 0, 0));
+        commandPalette = palette;
+        return palette;
+    }
+
+    private void showCommandPalette() {
+        refreshCommandPalette();
+        commandPalette.setManaged(true);
+        commandPalette.setVisible(true);
+        commandPalette.toFront();
+        commandPaletteInput.requestFocus();
+        commandPaletteInput.selectAll();
+    }
+
+    private void hideCommandPalette() {
+        commandPalette.setVisible(false);
+        commandPalette.setManaged(false);
+        editor.requestFocus();
+    }
+
+    private void refreshCommandPalette() {
+        if (commandPaletteList == null) {
+            return;
+        }
+
+        String query = commandPaletteInput.getText() == null ? "" : commandPaletteInput.getText().toLowerCase(Locale.ROOT).strip();
+        List<CommandDescriptor> commands = commandService.commands().stream()
+                .filter(command -> commandMatches(command, query))
+                .toList();
+        commandPaletteList.setItems(FXCollections.observableArrayList(commands));
+        if (!commands.isEmpty()) {
+            commandPaletteList.getSelectionModel().select(0);
+        }
+    }
+
+    private static boolean commandMatches(CommandDescriptor command, String query) {
+        if (query.isBlank()) {
+            return true;
+        }
+        return command.title().toLowerCase(Locale.ROOT).contains(query)
+                || command.id().toLowerCase(Locale.ROOT).contains(query)
+                || command.keyBinding().map(binding -> binding.toLowerCase(Locale.ROOT).contains(query)).orElse(false);
+    }
+
+    private void executeSelectedCommand() {
+        CommandDescriptor selected = commandPaletteList.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            return;
+        }
+        hideCommandPalette();
+        commandService.executeCommand(selected.id());
+    }
+
+    private void moveCommandSelection(int delta) {
+        int size = commandPaletteList.getItems().size();
+        if (size == 0) {
+            return;
+        }
+        int current = commandPaletteList.getSelectionModel().getSelectedIndex();
+        int next = Math.max(0, Math.min(size - 1, current + delta));
+        commandPaletteList.getSelectionModel().select(next);
+        commandPaletteList.scrollTo(next);
+    }
+
     private VBox buildSidebar() {
         Label title = new Label("EXPLORER");
         title.getStyleClass().add("sidebar-title");
@@ -402,48 +540,67 @@ public final class ZeroIdeApp extends Application {
         return statusBar;
     }
 
-    private void configureMenus(MenuBar menuBar, Stage stage) {
-        Menu fileMenu = new Menu("File");
-        MenuItem newFile = item("New", "Shortcut+N", ignored -> {
+    private void configureCoreCommands(Stage stage) {
+        commandService.registerCommand("core.command-palette.show", "Show Command Palette", "Shortcut+Shift+P", this::showCommandPalette);
+        commandService.registerCommand("core.file.new", "File: New", "Shortcut+N", () -> {
             editorService.newFile();
             fileLabel.setText("Untitled");
         });
-        MenuItem open = item("Open...", "Shortcut+O", ignored -> openFile(stage));
-        MenuItem openFolder = item("Open Folder...", "Shortcut+K", ignored -> openWorkspace(stage));
-        recentWorkspacesMenu = new Menu("Recent Workspaces");
-        refreshRecentWorkspacesMenu();
-        MenuItem save = item("Save", "Shortcut+S", ignored -> {
+        commandService.registerCommand("core.file.open", "File: Open File", "Shortcut+O", () -> openFile(stage));
+        commandService.registerCommand("core.file.open-folder", "File: Open Folder", "Shortcut+K", () -> openWorkspace(stage));
+        commandService.registerCommand("core.file.save", "File: Save", "Shortcut+S", () -> {
             editorService.saveCurrentFile();
             updateFileLabel();
         });
-        MenuItem saveAs = item("Save As...", "Shortcut+Shift+S", ignored -> saveAs(stage));
+        commandService.registerCommand("core.file.save-as", "File: Save As", "Shortcut+Shift+S", () -> saveAs(stage));
+        commandService.registerCommand("core.view.toggle-sidebar", "View: Toggle Sidebar", "Shortcut+B", this::toggleSidebar);
+        commandService.registerCommand("core.view.toggle-tools", "View: Toggle Tools", "Shortcut+Shift+B", this::toggleToolPanel);
+        commandService.registerCommand("core.view.toggle-bottom-panel", "View: Toggle Bottom Panel", "Shortcut+J", this::toggleBottomPanel);
+        commandService.registerCommand("core.plugins.load-all", "Plugins: Load All", () -> {
+            pluginManager.loadAll();
+            refreshPluginList();
+        });
+        commandService.registerCommand("core.plugins.unload-selected", "Plugins: Unload Selected", this::unloadSelectedPlugin);
+    }
+
+    private void configureMenus(MenuBar menuBar, Stage stage) {
+        Menu fileMenu = new Menu("File");
+        MenuItem newFile = commandItem("core.file.new");
+        MenuItem open = commandItem("core.file.open");
+        MenuItem openFolder = commandItem("core.file.open-folder");
+        recentWorkspacesMenu = new Menu("Recent Workspaces");
+        refreshRecentWorkspacesMenu();
+        MenuItem save = commandItem("core.file.save");
+        MenuItem saveAs = commandItem("core.file.save-as");
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(ignored -> Platform.exit());
         fileMenu.getItems().addAll(newFile, open, openFolder, recentWorkspacesMenu, new SeparatorMenuItem(), save, saveAs, new SeparatorMenuItem(), exit);
 
         Menu pluginMenu = new Menu("Plugins");
-        MenuItem loadAll = new MenuItem("Load All From Plugin Folder");
-        loadAll.setOnAction(ignored -> {
-            pluginManager.loadAll();
-            refreshPluginList();
-        });
-        MenuItem unloadSelected = new MenuItem("Unload Selected");
-        unloadSelected.setOnAction(ignored -> unloadSelectedPlugin());
+        MenuItem loadAll = commandItem("core.plugins.load-all");
+        MenuItem unloadSelected = commandItem("core.plugins.unload-selected");
         pluginMenu.getItems().addAll(loadAll, unloadSelected);
 
         Menu viewMenu = new Menu("View");
-        MenuItem toggleSidebar = item("Toggle Sidebar", "Shortcut+B", ignored -> toggleSidebar());
-        MenuItem toggleTools = item("Toggle Tools", "Shortcut+Shift+B", ignored -> toggleToolPanel());
-        MenuItem togglePanel = item("Toggle Bottom Panel", "Shortcut+J", ignored -> toggleBottomPanel());
+        MenuItem commandPalette = commandItem("core.command-palette.show");
+        MenuItem toggleSidebar = commandItem("core.view.toggle-sidebar");
+        MenuItem toggleTools = commandItem("core.view.toggle-tools");
+        MenuItem togglePanel = commandItem("core.view.toggle-bottom-panel");
+        viewMenu.getItems().add(commandPalette);
+        viewMenu.getItems().add(new SeparatorMenuItem());
         viewMenu.getItems().addAll(toggleSidebar, toggleTools, togglePanel);
 
         menuBar.getMenus().addAll(fileMenu, viewMenu, pluginMenu);
     }
 
-    private MenuItem item(String title, String shortcut, javafx.event.EventHandler<javafx.event.ActionEvent> action) {
-        MenuItem item = new MenuItem(title);
-        item.setAccelerator(KeyCombination.keyCombination(shortcut));
-        item.setOnAction(action);
+    private MenuItem commandItem(String commandId) {
+        CommandDescriptor command = commandService.commands().stream()
+                .filter(candidate -> candidate.id().equals(commandId))
+                .findFirst()
+                .orElse(new CommandDescriptor(commandId, commandId, (String) null));
+        MenuItem item = new MenuItem(command.title());
+        command.keyBinding().ifPresent(binding -> item.setAccelerator(KeyCombination.keyCombination(binding)));
+        item.setOnAction(ignored -> commandService.executeCommand(commandId));
         return item;
     }
 
