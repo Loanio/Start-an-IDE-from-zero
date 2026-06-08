@@ -2,6 +2,7 @@ package com.zeroide.core;
 
 import com.zeroide.api.EditorService;
 import com.zeroide.api.events.TextChangedEvent;
+import com.zeroide.core.editor.RichCodeEditor;
 import com.zeroide.core.plugins.DynamicPluginManager;
 import com.zeroide.core.plugins.LoadedPlugin;
 import com.zeroide.core.services.CoreContainer;
@@ -13,6 +14,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -24,7 +26,6 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TabPane;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCombination;
@@ -43,14 +44,22 @@ import java.nio.file.Path;
 import java.util.List;
 
 public final class ZeroIdeApp extends Application {
-    private TextArea editor;
+    private RichCodeEditor editor;
     private Label fileLabel;
     private Label metricsLabel;
     private ListView<LoadedPlugin> pluginList;
     private TabPane toolPanelTabs;
+    private BorderPane workspaceShell;
+    private SplitPane workspaceSplitPane;
+    private VBox sidebar;
+    private BorderPane toolPanelHost;
     private CoreContainer container;
     private DynamicPluginManager pluginManager;
     private JavaFxEditorService editorService;
+    private boolean sidebarVisible = true;
+    private boolean toolPanelVisible = true;
+    private double sidebarDividerPosition = 0.22;
+    private double toolPanelDividerPosition = 0.72;
     private double dragOffsetX;
     private double dragOffsetY;
 
@@ -184,25 +193,48 @@ public final class ZeroIdeApp extends Application {
         }
     }
 
-    private TextArea buildEditor() {
-        TextArea textArea = new TextArea();
-        textArea.getStyleClass().add("code-editor");
-        textArea.setWrapText(false);
-        textArea.setText("""
+    private RichCodeEditor buildEditor() {
+        RichCodeEditor codeEditor = new RichCodeEditor();
+        codeEditor.setInitialText("""
                 public class HelloZeroIde {
                     public static void main(String[] args) {
                         System.out.println("Hello, plugin architecture.");
                     }
                 }
                 """);
-        return textArea;
+        return codeEditor;
     }
 
-    private SplitPane buildWorkspace() {
-        SplitPane splitPane = new SplitPane();
-        splitPane.getItems().addAll(buildSidebar(), editor, toolPanelTabs);
-        splitPane.setDividerPositions(0.22, 0.72);
-        return splitPane;
+    private BorderPane buildWorkspace() {
+        workspaceShell = new BorderPane();
+        workspaceShell.getStyleClass().add("workspace-shell");
+
+        sidebar = buildSidebar();
+        toolPanelHost = buildToolPanelHost();
+        workspaceSplitPane = new SplitPane();
+        workspaceSplitPane.getStyleClass().add("workspace-split");
+
+        updateWorkspacePanels();
+        workspaceShell.setCenter(workspaceSplitPane);
+        return workspaceShell;
+    }
+
+    private BorderPane buildToolPanelHost() {
+        Label title = new Label("TOOLS");
+        title.getStyleClass().add("side-panel-title");
+
+        Button collapse = sideToggleButton(">", "Hide right tools");
+        collapse.getStyleClass().add("side-collapse-button");
+        collapse.setOnAction(ignored -> toggleToolPanel());
+
+        HBox header = new HBox(title, spacer(), collapse);
+        header.getStyleClass().add("side-panel-header");
+
+        BorderPane host = new BorderPane();
+        host.getStyleClass().add("tool-panel-host");
+        host.setTop(header);
+        host.setCenter(toolPanelTabs);
+        return host;
     }
 
     private TabPane buildToolPanelTabs() {
@@ -216,6 +248,12 @@ public final class ZeroIdeApp extends Application {
     private VBox buildSidebar() {
         Label title = new Label("EXPLORER");
         title.getStyleClass().add("sidebar-title");
+
+        Button collapse = sideToggleButton("<", "Hide left sidebar");
+        collapse.getStyleClass().add("side-collapse-button");
+        collapse.setOnAction(ignored -> toggleSidebar());
+        HBox explorerHeader = new HBox(title, spacer(), collapse);
+        explorerHeader.getStyleClass().add("side-panel-header");
 
         Label projectName = new Label("zero-ide");
         projectName.getStyleClass().add("project-name");
@@ -244,7 +282,7 @@ public final class ZeroIdeApp extends Application {
         HBox.setHgrow(unloadButton, Priority.ALWAYS);
         HBox.setHgrow(refreshButton, Priority.ALWAYS);
 
-        VBox sidebar = new VBox(10, title, projectName, new Separator(Orientation.HORIZONTAL), pluginTitle, pluginList, pluginActions);
+        VBox sidebar = new VBox(10, explorerHeader, projectName, new Separator(Orientation.HORIZONTAL), pluginTitle, pluginList, pluginActions);
         sidebar.getStyleClass().add("sidebar");
         VBox.setVgrow(pluginList, Priority.ALWAYS);
         return sidebar;
@@ -308,7 +346,12 @@ public final class ZeroIdeApp extends Application {
         unloadSelected.setOnAction(ignored -> unloadSelectedPlugin());
         pluginMenu.getItems().addAll(loadAll, unloadSelected);
 
-        menuBar.getMenus().addAll(fileMenu, pluginMenu);
+        Menu viewMenu = new Menu("View");
+        MenuItem toggleSidebar = item("Toggle Sidebar", "Shortcut+B", ignored -> toggleSidebar());
+        MenuItem toggleTools = item("Toggle Tools", "Shortcut+Shift+B", ignored -> toggleToolPanel());
+        viewMenu.getItems().addAll(toggleSidebar, toggleTools);
+
+        menuBar.getMenus().addAll(fileMenu, viewMenu, pluginMenu);
     }
 
     private MenuItem item(String title, String shortcut, javafx.event.EventHandler<javafx.event.ActionEvent> action) {
@@ -387,5 +430,99 @@ public final class ZeroIdeApp extends Application {
             return Path.of("plugins").toAbsolutePath().normalize();
         }
         return Path.of(configured).toAbsolutePath().normalize();
+    }
+
+    private void toggleSidebar() {
+        rememberDividerPositions();
+        sidebarVisible = !sidebarVisible;
+        updateWorkspacePanels();
+    }
+
+    private void toggleToolPanel() {
+        rememberDividerPositions();
+        toolPanelVisible = !toolPanelVisible;
+        updateWorkspacePanels();
+    }
+
+    private void updateWorkspacePanels() {
+        if (workspaceSplitPane == null) {
+            return;
+        }
+
+        workspaceSplitPane.getItems().setAll(workspaceItems());
+        workspaceShell.setLeft(sidebarVisible ? null : collapsedRail("FILES", ">", "Show left sidebar", this::toggleSidebar, "left-rail"));
+        workspaceShell.setRight(toolPanelVisible ? null : collapsedRail("TOOLS", "<", "Show right tools", this::toggleToolPanel, "right-rail"));
+
+        if (sidebarVisible && toolPanelVisible) {
+            workspaceSplitPane.setDividerPositions(sidebarDividerPosition, toolPanelDividerPosition);
+        } else if (sidebarVisible) {
+            workspaceSplitPane.setDividerPositions(sidebarDividerPosition);
+        } else if (toolPanelVisible) {
+            workspaceSplitPane.setDividerPositions(toolPanelDividerPosition);
+        }
+    }
+
+    private void rememberDividerPositions() {
+        if (workspaceSplitPane == null) {
+            return;
+        }
+
+        double[] positions = workspaceSplitPane.getDividerPositions();
+        if (positions.length == 2) {
+            sidebarDividerPosition = clampDivider(positions[0]);
+            toolPanelDividerPosition = clampDivider(positions[1]);
+        } else if (positions.length == 1 && sidebarVisible) {
+            sidebarDividerPosition = clampDivider(positions[0]);
+        } else if (positions.length == 1 && toolPanelVisible) {
+            toolPanelDividerPosition = clampDivider(positions[0]);
+        }
+    }
+
+    private List<Node> workspaceItems() {
+        if (sidebarVisible && toolPanelVisible) {
+            return List.of(sidebar, editor, toolPanelHost);
+        }
+        if (sidebarVisible) {
+            return List.of(sidebar, editor);
+        }
+        if (toolPanelVisible) {
+            return List.of(editor, toolPanelHost);
+        }
+        return List.of(editor);
+    }
+
+    private VBox collapsedRail(String text, String buttonText, String tooltip, Runnable action, String sideClass) {
+        Region accent = new Region();
+        accent.getStyleClass().add("collapsed-rail-accent");
+
+        Button button = sideToggleButton(buttonText, tooltip);
+        button.getStyleClass().add("collapsed-rail-button");
+        button.setOnAction(ignored -> action.run());
+
+        Label label = new Label(text);
+        label.getStyleClass().add("collapsed-rail-label");
+
+        VBox rail = new VBox(8, accent, button, label);
+        rail.getStyleClass().addAll("collapsed-rail", sideClass);
+        rail.setAlignment(Pos.TOP_CENTER);
+        return rail;
+    }
+
+    private Button sideToggleButton(String text, String tooltip) {
+        Button button = new Button(text);
+        button.getStyleClass().add("side-toggle-button");
+        button.setTooltip(new Tooltip(tooltip));
+        button.setFocusTraversable(false);
+        return button;
+    }
+
+    private static HBox spacer() {
+        HBox spacer = new HBox();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        return spacer;
+    }
+
+    private static double clampDivider(double position) {
+        return Math.max(0.12, Math.min(0.88, position));
     }
 }

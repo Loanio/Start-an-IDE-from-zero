@@ -4,8 +4,8 @@ import com.zeroide.api.EditorService;
 import com.zeroide.api.EventBus;
 import com.zeroide.api.events.FileOpenedEvent;
 import com.zeroide.api.events.FileSavedEvent;
+import com.zeroide.core.editor.RichCodeEditor;
 import javafx.application.Platform;
-import javafx.scene.control.TextArea;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import org.slf4j.Logger;
@@ -20,40 +20,40 @@ import java.util.Optional;
 public final class JavaFxEditorService implements EditorService {
     private static final Logger log = LoggerFactory.getLogger(JavaFxEditorService.class);
 
-    private final TextArea textArea;
+    private final RichCodeEditor editor;
     private final Window owner;
     private final EventBus eventBus;
     private Path currentFile;
 
-    public JavaFxEditorService(TextArea textArea, Window owner, EventBus eventBus) {
-        this.textArea = textArea;
+    public JavaFxEditorService(RichCodeEditor editor, Window owner, EventBus eventBus) {
+        this.editor = editor;
         this.owner = owner;
         this.eventBus = eventBus;
     }
 
     @Override
     public String getText() {
-        return textArea.getText();
+        return editor.getText();
     }
 
     @Override
     public void replaceText(String text) {
-        runOnFxThread(() -> textArea.setText(text == null ? "" : text));
+        runOnFxThread(() -> editor.replaceText(text == null ? "" : text));
     }
 
     @Override
     public void insertText(String text) {
-        runOnFxThread(() -> textArea.insertText(textArea.getCaretPosition(), text));
+        runOnFxThread(() -> editor.insertText(editor.getCaretPosition(), text));
     }
 
     @Override
     public void selectRange(int start, int end) {
         runOnFxThread(() -> {
-            int length = textArea.getLength();
+            int length = editor.getLength();
             int safeStart = Math.max(0, Math.min(start, length));
             int safeEnd = Math.max(safeStart, Math.min(end, length));
-            textArea.requestFocus();
-            textArea.selectRange(safeStart, safeEnd);
+            editor.requestFocus();
+            editor.selectRange(safeStart, safeEnd);
         });
     }
 
