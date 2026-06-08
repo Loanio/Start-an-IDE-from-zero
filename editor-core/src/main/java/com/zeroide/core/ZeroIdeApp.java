@@ -1,7 +1,10 @@
 package com.zeroide.core;
 
 import com.zeroide.api.EditorService;
+import com.zeroide.api.Subscription;
+import com.zeroide.api.WorkspaceService;
 import com.zeroide.api.events.TextChangedEvent;
+import com.zeroide.api.events.WorkspaceChangedEvent;
 import com.zeroide.core.editor.RichCodeEditor;
 import com.zeroide.core.plugins.DynamicPluginManager;
 import com.zeroide.core.plugins.LoadedPlugin;
@@ -36,6 +39,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -46,6 +50,8 @@ import java.util.List;
 public final class ZeroIdeApp extends Application {
     private RichCodeEditor editor;
     private Label fileLabel;
+    private Label workspaceLabel;
+    private Label projectNameLabel;
     private Label metricsLabel;
     private ListView<LoadedPlugin> pluginList;
     private TabPane toolPanelTabs;
@@ -56,6 +62,9 @@ public final class ZeroIdeApp extends Application {
     private CoreContainer container;
     private DynamicPluginManager pluginManager;
     private JavaFxEditorService editorService;
+    private WorkspaceService workspaceService;
+    private Subscription workspaceSubscription;
+    private Menu recentWorkspacesMenu;
     private boolean sidebarVisible = true;
     private boolean toolPanelVisible = true;
     private double sidebarDividerPosition = 0.22;
@@ -81,9 +90,11 @@ public final class ZeroIdeApp extends Application {
         container = CoreContainer.create(editor, menuBar, statusBar, toolPanelTabs, stage, pluginDirectory);
         pluginManager = container.getBean(DynamicPluginManager.class);
         editorService = (JavaFxEditorService) container.getBean(EditorService.class);
+        workspaceService = container.getBean(WorkspaceService.class);
 
         configureMenus(menuBar, stage);
         configureEditorEvents();
+        configureWorkspaceEvents();
 
         BorderPane root = new BorderPane();
         root.getStyleClass().add("app-root");
@@ -105,6 +116,7 @@ public final class ZeroIdeApp extends Application {
         pluginManager.loadAll();
         refreshPluginList();
         updateMetrics();
+        updateWorkspaceLabel();
     }
 
     private void configureWindowIcon(Stage stage) {
@@ -188,6 +200,9 @@ public final class ZeroIdeApp extends Application {
         if (pluginManager != null) {
             pluginManager.unloadAll();
         }
+        if (workspaceSubscription != null) {
+            workspaceSubscription.close();
+        }
         if (container != null) {
             container.close();
         }
@@ -255,8 +270,8 @@ public final class ZeroIdeApp extends Application {
         HBox explorerHeader = new HBox(title, spacer(), collapse);
         explorerHeader.getStyleClass().add("side-panel-header");
 
-        Label projectName = new Label("zero-ide");
-        projectName.getStyleClass().add("project-name");
+        projectNameLabel = new Label("No workspace");
+        projectNameLabel.getStyleClass().add("project-name");
 
         Label pluginTitle = new Label("PLUGINS");
         pluginTitle.getStyleClass().add("sidebar-title");
@@ -282,7 +297,7 @@ public final class ZeroIdeApp extends Application {
         HBox.setHgrow(unloadButton, Priority.ALWAYS);
         HBox.setHgrow(refreshButton, Priority.ALWAYS);
 
-        VBox sidebar = new VBox(10, explorerHeader, projectName, new Separator(Orientation.HORIZONTAL), pluginTitle, pluginList, pluginActions);
+        VBox sidebar = new VBox(10, explorerHeader, projectNameLabel, new Separator(Orientation.HORIZONTAL), pluginTitle, pluginList, pluginActions);
         sidebar.getStyleClass().add("sidebar");
         VBox.setVgrow(pluginList, Priority.ALWAYS);
         return sidebar;
@@ -308,13 +323,15 @@ public final class ZeroIdeApp extends Application {
     private HBox buildStatusBar() {
         fileLabel = new Label("Untitled");
         fileLabel.getStyleClass().add("status-item");
+        workspaceLabel = new Label("No workspace");
+        workspaceLabel.getStyleClass().add("status-item");
         metricsLabel = new Label("");
         metricsLabel.getStyleClass().add("status-item");
 
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox statusBar = new HBox(14, fileLabel, metricsLabel, spacer);
+        HBox statusBar = new HBox(14, workspaceLabel, fileLabel, metricsLabel, spacer);
         statusBar.getStyleClass().add("status-bar");
         statusBar.setPadding(new Insets(0, 12, 0, 12));
         return statusBar;
@@ -327,6 +344,9 @@ public final class ZeroIdeApp extends Application {
             fileLabel.setText("Untitled");
         });
         MenuItem open = item("Open...", "Shortcut+O", ignored -> openFile(stage));
+        MenuItem openFolder = item("Open Folder...", "Shortcut+K", ignored -> openWorkspace(stage));
+        recentWorkspacesMenu = new Menu("Recent Workspaces");
+        refreshRecentWorkspacesMenu();
         MenuItem save = item("Save", "Shortcut+S", ignored -> {
             editorService.saveCurrentFile();
             updateFileLabel();
@@ -334,7 +354,7 @@ public final class ZeroIdeApp extends Application {
         MenuItem saveAs = item("Save As...", "Shortcut+Shift+S", ignored -> saveAs(stage));
         MenuItem exit = new MenuItem("Exit");
         exit.setOnAction(ignored -> Platform.exit());
-        fileMenu.getItems().addAll(newFile, open, save, saveAs, new SeparatorMenuItem(), exit);
+        fileMenu.getItems().addAll(newFile, open, openFolder, recentWorkspacesMenu, new SeparatorMenuItem(), save, saveAs, new SeparatorMenuItem(), exit);
 
         Menu pluginMenu = new Menu("Plugins");
         MenuItem loadAll = new MenuItem("Load All From Plugin Folder");
@@ -368,6 +388,13 @@ public final class ZeroIdeApp extends Application {
         });
     }
 
+    private void configureWorkspaceEvents() {
+        workspaceSubscription = container.getBean(com.zeroide.api.EventBus.class).subscribe(WorkspaceChangedEvent.class, ignored -> {
+            updateWorkspaceLabel();
+            refreshRecentWorkspacesMenu();
+        });
+    }
+
     private void openFile(Stage stage) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Open File");
@@ -385,6 +412,16 @@ public final class ZeroIdeApp extends Application {
         if (file != null) {
             editorService.saveAs(file.toPath());
             updateFileLabel();
+        }
+    }
+
+    private void openWorkspace(Stage stage) {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Open Workspace Folder");
+        workspaceService.getWorkspace().ifPresent(path -> chooser.setInitialDirectory(path.toFile()));
+        var directory = chooser.showDialog(stage);
+        if (directory != null) {
+            workspaceService.openWorkspace(directory.toPath());
         }
     }
 
@@ -422,6 +459,40 @@ public final class ZeroIdeApp extends Application {
         fileLabel.setText(editorService.getCurrentFile()
                 .map(path -> path.getFileName().toString())
                 .orElse("Untitled"));
+    }
+
+    private void updateWorkspaceLabel() {
+        String name = workspaceService.getWorkspace()
+                .map(path -> {
+                    Path fileName = path.getFileName();
+                    return fileName == null ? path.toString() : fileName.toString();
+                })
+                .orElse("No workspace");
+        workspaceLabel.setText("Workspace: " + name);
+        if (projectNameLabel != null) {
+            projectNameLabel.setText(name);
+        }
+    }
+
+    private void refreshRecentWorkspacesMenu() {
+        if (recentWorkspacesMenu == null || workspaceService == null) {
+            return;
+        }
+
+        recentWorkspacesMenu.getItems().clear();
+        List<Path> recent = workspaceService.getRecentWorkspaces();
+        if (recent.isEmpty()) {
+            MenuItem empty = new MenuItem("No recent workspaces");
+            empty.setDisable(true);
+            recentWorkspacesMenu.getItems().add(empty);
+            return;
+        }
+
+        for (Path path : recent) {
+            MenuItem item = new MenuItem(path.toString());
+            item.setOnAction(ignored -> workspaceService.openWorkspace(path));
+            recentWorkspacesMenu.getItems().add(item);
+        }
     }
 
     private static Path resolvePluginDirectory() {

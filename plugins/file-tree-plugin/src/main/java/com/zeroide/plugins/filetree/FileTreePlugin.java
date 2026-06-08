@@ -4,6 +4,7 @@ import com.zeroide.api.EditorContext;
 import com.zeroide.api.Plugin;
 import com.zeroide.api.Subscription;
 import com.zeroide.api.events.FileOpenedEvent;
+import com.zeroide.api.events.WorkspaceChangedEvent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TreeCell;
@@ -28,6 +29,7 @@ public final class FileTreePlugin implements Plugin {
 
     private EditorContext context;
     private Subscription fileSubscription;
+    private Subscription workspaceSubscription;
     private TreeView<Path> treeView;
     private Label rootLabel;
 
@@ -40,6 +42,7 @@ public final class FileTreePlugin implements Plugin {
         fileSubscription = context.events().subscribe(FileOpenedEvent.class, event ->
                 context.ui().updateStatusItem(STATUS_ID, "Opened " + event.path().getFileName())
         );
+        workspaceSubscription = context.events().subscribe(WorkspaceChangedEvent.class, event -> setRootPath(event.workspace()));
         setRootPath(initialRoot());
     }
 
@@ -47,6 +50,9 @@ public final class FileTreePlugin implements Plugin {
     public void onUnload() {
         if (fileSubscription != null) {
             fileSubscription.close();
+        }
+        if (workspaceSubscription != null) {
+            workspaceSubscription.close();
         }
         if (context != null) {
             context.ui().removeMenuAction(REFRESH_ID);
@@ -103,7 +109,7 @@ public final class FileTreePlugin implements Plugin {
         }
         var selected = chooser.showDialog(null);
         if (selected != null) {
-            setRootPath(selected.toPath());
+            context.workspace().openWorkspace(selected.toPath());
         }
     }
 
@@ -131,9 +137,10 @@ public final class FileTreePlugin implements Plugin {
     }
 
     private Path initialRoot() {
-        return context.editor().getCurrentFile()
+        return context.workspace().getWorkspace()
+                .or(() -> context.editor().getCurrentFile()
                 .map(path -> Files.isDirectory(path) ? path : path.getParent())
-                .filter(path -> path != null && Files.isDirectory(path))
+                .filter(path -> path != null && Files.isDirectory(path)))
                 .orElse(Path.of(System.getProperty("user.dir")));
     }
 

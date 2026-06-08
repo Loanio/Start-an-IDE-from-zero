@@ -4,6 +4,7 @@ import com.zeroide.api.EditorContext;
 import com.zeroide.api.Plugin;
 import com.zeroide.api.Subscription;
 import com.zeroide.api.events.TextChangedEvent;
+import com.zeroide.api.events.WorkspaceChangedEvent;
 import javafx.collections.FXCollections;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
@@ -15,20 +16,29 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 public final class SearchPlugin implements Plugin {
     private static final String PANEL_ID = "plugin.search.panel";
     private static final String STATUS_ID = "plugin.search.status";
     private static final String SEARCH_ID = "plugin.search.run";
+    private static final String WORKSPACE_SEARCH_ID = "plugin.search.workspace";
+    private static final int MAX_WORKSPACE_HITS = 500;
 
     private EditorContext context;
     private Subscription textSubscription;
+    private Subscription workspaceSubscription;
     private TextField queryField;
     private TextField replacementField;
     private CheckBox caseSensitive;
     private Label countLabel;
+    private Label scopeLabel;
     private ListView<SearchHit> results;
 
     @Override
@@ -36,8 +46,10 @@ public final class SearchPlugin implements Plugin {
         this.context = context;
         context.ui().addStatusItem(STATUS_ID, "Search ready");
         context.ui().addMenuAction("Search", SEARCH_ID, "Search Current File", this::search);
+        context.ui().addMenuAction("Search", WORKSPACE_SEARCH_ID, "Search Workspace", this::searchWorkspace);
         context.ui().addToolPanel(PANEL_ID, "Search", buildPanel());
         textSubscription = context.events().subscribe(TextChangedEvent.class, ignored -> search());
+        workspaceSubscription = context.events().subscribe(WorkspaceChangedEvent.class, ignored -> updateScopeLabel());
     }
 
     @Override
@@ -45,8 +57,12 @@ public final class SearchPlugin implements Plugin {
         if (textSubscription != null) {
             textSubscription.close();
         }
+        if (workspaceSubscription != null) {
+            workspaceSubscription.close();
+        }
         if (context != null) {
             context.ui().removeMenuAction(SEARCH_ID);
+            context.ui().removeMenuAction(WORKSPACE_SEARCH_ID);
             context.ui().removeToolPanel(PANEL_ID);
             context.ui().removeStatusItem(STATUS_ID);
         }
@@ -59,6 +75,10 @@ public final class SearchPlugin implements Plugin {
         countLabel.getStyleClass().add("plugin-panel-meta");
         HBox header = new HBox(title, spacer(), countLabel);
         header.getStyleClass().add("plugin-panel-header");
+        scopeLabel = new Label();
+        scopeLabel.getStyleClass().add("plugin-panel-meta");
+        scopeLabel.setWrapText(true);
+        updateScopeLabel();
 
         queryField = new TextField();
         queryField.setPromptText("Find");
@@ -79,11 +99,15 @@ public final class SearchPlugin implements Plugin {
         replaceAll.getStyleClass().add("plugin-quiet-button");
         replaceAll.setOnAction(ignored -> replaceAll());
 
+        Button workspace = new Button("Workspace");
+        workspace.getStyleClass().add("plugin-quiet-button");
+        workspace.setOnAction(ignored -> searchWorkspace());
+
         Button clear = new Button("Clear");
         clear.getStyleClass().add("plugin-quiet-button");
         clear.setOnAction(ignored -> clear());
 
-        HBox actions = new HBox(6, caseSensitive, find, replaceAll, clear);
+        HBox actions = new HBox(6, caseSensitive, find, workspace, replaceAll, clear);
         actions.getStyleClass().add("plugin-toolbar");
         results = new ListView<>();
         results.setCellFactory(ignored -> new ListCell<>() {
@@ -98,7 +122,7 @@ public final class SearchPlugin implements Plugin {
 
                 Label line = new Label(String.valueOf(hit.line()));
                 line.getStyleClass().add("search-line-badge");
-                Label snippet = new Label(hit.snippet());
+                Label snippet = new Label(hit.label());
                 snippet.getStyleClass().add("search-snippet");
                 HBox row = new HBox(8, line, snippet);
                 row.getStyleClass().add("search-result-row");
@@ -108,7 +132,7 @@ public final class SearchPlugin implements Plugin {
         });
         results.setOnMouseClicked(ignored -> selectCurrentHit());
 
-        VBox panel = new VBox(8, header, queryField, replacementField, actions, results);
+        VBox panel = new VBox(8, header, scopeLabel, queryField, replacementField, actions, results);
         panel.getStyleClass().add("plugin-panel");
         VBox.setVgrow(results, Priority.ALWAYS);
         return panel;
@@ -126,7 +150,7 @@ public final class SearchPlugin implements Plugin {
             return;
         }
 
-        List<SearchHit> hits = findHits(context.editor().getText(), query, caseSensitive.isSelected());
+        List<SearchHit> hits = findHits(null, context.editor().getText(), query, caseSensitive.isSelected());
         results.setItems(FXCollections.observableArrayList(hits));
         countLabel.setText(hits.size() + " matches");
         context.ui().updateStatusItem(STATUS_ID, hits.size() + " matches");
@@ -139,7 +163,7 @@ public final class SearchPlugin implements Plugin {
         }
         String replacement = replacementField.getText() == null ? "" : replacementField.getText();
         String text = context.editor().getText();
-        List<SearchHit> hits = findHits(text, query, caseSensitive.isSelected());
+        List<SearchHit> hits = findHits(null, text, query, caseSensitive.isSelected());
         int matches = hits.size();
         context.editor().replaceText(replace(text, hits, replacement));
         context.ui().updateStatusItem(STATUS_ID, "Replaced " + matches);
@@ -156,23 +180,97 @@ public final class SearchPlugin implements Plugin {
     private void selectCurrentHit() {
         SearchHit hit = results.getSelectionModel().getSelectedItem();
         if (hit != null) {
+            if (hit.file() != null) {
+                context.editor().openFile(hit.file());
+            }
             context.editor().selectRange(hit.start(), hit.end());
         }
     }
 
-    private static List<SearchHit> findHits(String text, String query, boolean matchCase) {
+    private void searchWorkspace() {
+        if (queryField == null || results == null) {
+            return;
+        }
+        String query = queryField.getText();
+        if (query == null || query.isEmpty()) {
+            clear();
+            return;
+        }
+
+        Path workspace = context.workspace().getWorkspace().orElse(null);
+        if (workspace == null) {
+            context.ui().updateStatusItem(STATUS_ID, "No workspace");
+            return;
+        }
+
+        List<SearchHit> hits = new ArrayList<>();
+        try (Stream<Path> stream = Files.walk(workspace)) {
+            stream
+                    .filter(SearchPlugin::isSearchableFile)
+                    .takeWhile(ignored -> hits.size() < MAX_WORKSPACE_HITS)
+                    .forEach(path -> addWorkspaceHits(hits, path, query));
+        } catch (IOException ex) {
+            context.ui().updateStatusItem(STATUS_ID, "Workspace search failed");
+            return;
+        }
+
+        results.setItems(FXCollections.observableArrayList(hits));
+        countLabel.setText(hits.size() + " matches");
+        context.ui().updateStatusItem(STATUS_ID, hits.size() + " workspace matches");
+    }
+
+    private void addWorkspaceHits(List<SearchHit> hits, Path path, String query) {
+        try {
+            String text = Files.readString(path, StandardCharsets.UTF_8);
+            for (SearchHit hit : findHits(path, text, query, caseSensitive.isSelected())) {
+                if (hits.size() == MAX_WORKSPACE_HITS) {
+                    return;
+                }
+                hits.add(hit);
+            }
+        } catch (IOException ignored) {
+            // Files that cannot be decoded as UTF-8 are skipped.
+        }
+    }
+
+    private void updateScopeLabel() {
+        if (scopeLabel == null) {
+            return;
+        }
+        String scope = context.workspace().getWorkspace()
+                .map(Path::toString)
+                .orElse("No workspace");
+        scopeLabel.setText(scope);
+    }
+
+    private static boolean isSearchableFile(Path path) {
+        if (!Files.isRegularFile(path)) {
+            return false;
+        }
+        Path fileName = path.getFileName();
+        if (fileName == null || fileName.toString().startsWith(".")) {
+            return false;
+        }
+        try {
+            return Files.size(path) <= 1024 * 1024;
+        } catch (IOException ex) {
+            return false;
+        }
+    }
+
+    private static List<SearchHit> findHits(Path file, String text, String query, boolean matchCase) {
         List<SearchHit> hits = new ArrayList<>();
         String haystack = matchCase ? text : text.toLowerCase();
         String needle = matchCase ? query : query.toLowerCase();
         int index = 0;
         while ((index = haystack.indexOf(needle, index)) >= 0) {
-            hits.add(toHit(text, index, query.length()));
+            hits.add(toHit(file, text, index, query.length()));
             index += Math.max(needle.length(), 1);
         }
         return hits;
     }
 
-    private static SearchHit toHit(String text, int index, int queryLength) {
+    private static SearchHit toHit(Path file, String text, int index, int queryLength) {
         int line = 1;
         int lineStart = 0;
         for (int i = 0; i < index; i++) {
@@ -186,7 +284,7 @@ public final class SearchPlugin implements Plugin {
             lineEnd = text.length();
         }
         String snippet = text.substring(lineStart, lineEnd).strip();
-        return new SearchHit(line, index, index + queryLength, snippet);
+        return new SearchHit(file, line, index, index + queryLength, snippet);
     }
 
     private static String replace(String text, List<SearchHit> hits, String replacement) {
@@ -204,6 +302,13 @@ public final class SearchPlugin implements Plugin {
         return spacer;
     }
 
-    private record SearchHit(int line, int start, int end, String snippet) {
+    private record SearchHit(Path file, int line, int start, int end, String snippet) {
+        private String label() {
+            if (file == null) {
+                return snippet;
+            }
+            Path fileName = file.getFileName();
+            return (fileName == null ? file.toString() : fileName.toString()) + "  " + snippet;
+        }
     }
 }

@@ -6,4 +6,6 @@ public interface EditorContext {
     EventBus events();
 
     UIService ui();
+
+    WorkspaceService workspace();
 }

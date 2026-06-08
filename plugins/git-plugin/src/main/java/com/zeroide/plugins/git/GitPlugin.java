@@ -2,6 +2,8 @@ package com.zeroide.plugins.git;
 
 import com.zeroide.api.EditorContext;
 import com.zeroide.api.Plugin;
+import com.zeroide.api.Subscription;
+import com.zeroide.api.events.WorkspaceChangedEvent;
 import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -28,6 +30,7 @@ public final class GitPlugin implements Plugin {
     private static final String LOG_ACTION_ID = "plugin.git.log-action";
 
     private EditorContext context;
+    private Subscription workspaceSubscription;
     private Label repoLabel;
     private Label commandLabel;
     private TextArea output;
@@ -39,11 +42,15 @@ public final class GitPlugin implements Plugin {
         context.ui().addMenuAction("Git", STATUS_ACTION_ID, "Status", () -> runGit("status", "--short", "--branch"));
         context.ui().addMenuAction("Git", LOG_ACTION_ID, "Recent Commits", () -> runGit("log", "--oneline", "-10"));
         context.ui().addToolPanel(PANEL_ID, "Git", buildPanel());
+        workspaceSubscription = context.events().subscribe(WorkspaceChangedEvent.class, ignored -> runGit("status", "--short", "--branch"));
         runGit("status", "--short", "--branch");
     }
 
     @Override
     public void onUnload() {
+        if (workspaceSubscription != null) {
+            workspaceSubscription.close();
+        }
         if (context != null) {
             context.ui().removeMenuAction(STATUS_ACTION_ID);
             context.ui().removeMenuAction(LOG_ACTION_ID);
@@ -149,9 +156,10 @@ public final class GitPlugin implements Plugin {
     }
 
     private Optional<Path> findRepository() {
-        Path start = context.editor().getCurrentFile()
+        Path start = context.workspace().getWorkspace()
+                .or(() -> context.editor().getCurrentFile()
                 .map(path -> Files.isDirectory(path) ? path : path.getParent())
-                .filter(path -> path != null)
+                .filter(path -> path != null))
                 .orElse(Path.of(System.getProperty("user.dir")))
                 .toAbsolutePath()
                 .normalize();

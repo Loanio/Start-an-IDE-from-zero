@@ -4,6 +4,7 @@ import com.zeroide.api.EditorContext;
 import com.zeroide.api.EditorService;
 import com.zeroide.api.EventBus;
 import com.zeroide.api.UIService;
+import com.zeroide.api.WorkspaceService;
 import com.zeroide.core.events.DefaultEventBus;
 import com.zeroide.core.editor.RichCodeEditor;
 import com.zeroide.core.plugins.DynamicPluginManager;
@@ -26,11 +27,13 @@ public final class CoreContainer implements AutoCloseable {
         GenericApplicationContext context = new GenericApplicationContext();
         context.registerBean(EventBus.class, DefaultEventBus::new);
         context.registerBean(EditorService.class, () -> new JavaFxEditorService(editor, owner, context.getBean(EventBus.class)));
+        context.registerBean(WorkspaceService.class, () -> new DefaultWorkspaceService(context.getBean(EventBus.class)));
         context.registerBean(UIService.class, () -> new JavaFxUiService(menuBar, statusBar, toolPanels));
         context.registerBean(EditorContext.class, () -> new DefaultEditorContext(
                 context.getBean(EditorService.class),
                 context.getBean(EventBus.class),
-                context.getBean(UIService.class)
+                context.getBean(UIService.class),
+                context.getBean(WorkspaceService.class)
         ));
         context.registerBean(DynamicPluginManager.class, () -> new DynamicPluginManager(
                 pluginDirectory,

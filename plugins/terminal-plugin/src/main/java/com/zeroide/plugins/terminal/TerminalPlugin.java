@@ -2,6 +2,8 @@ package com.zeroide.plugins.terminal;
 
 import com.zeroide.api.EditorContext;
 import com.zeroide.api.Plugin;
+import com.zeroide.api.Subscription;
+import com.zeroide.api.events.WorkspaceChangedEvent;
 import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -27,6 +29,7 @@ public final class TerminalPlugin implements Plugin {
     private static final String CLEAR_ID = "plugin.terminal.clear";
 
     private EditorContext context;
+    private Subscription workspaceSubscription;
     private TextField commandField;
     private Label cwdLabel;
     private TextArea output;
@@ -39,10 +42,14 @@ public final class TerminalPlugin implements Plugin {
         context.ui().addStatusItem(STATUS_ID, "Terminal ready");
         context.ui().addMenuAction("Terminal", CLEAR_ID, "Clear Terminal", this::clear);
         context.ui().addToolPanel(PANEL_ID, "Terminal", buildPanel());
+        workspaceSubscription = context.events().subscribe(WorkspaceChangedEvent.class, ignored -> updateCwdLabel());
     }
 
     @Override
     public void onUnload() {
+        if (workspaceSubscription != null) {
+            workspaceSubscription.close();
+        }
         if (context != null) {
             context.ui().removeMenuAction(CLEAR_ID);
             context.ui().removeToolPanel(PANEL_ID);
@@ -140,12 +147,17 @@ public final class TerminalPlugin implements Plugin {
     }
 
     private Path workingDirectory() {
-        return context.editor().getCurrentFile()
+        return context.workspace().getWorkspace()
+                .or(() -> context.editor().getCurrentFile()
                 .map(path -> Files.isDirectory(path) ? path : path.getParent())
-                .filter(path -> path != null && Files.isDirectory(path))
+                .filter(path -> path != null && Files.isDirectory(path)))
                 .orElse(Path.of(System.getProperty("user.dir")))
                 .toAbsolutePath()
                 .normalize();
+    }
+
+    private void updateCwdLabel() {
+        Platform.runLater(() -> cwdLabel.setText(workingDirectory().toString()));
     }
 
     private static List<String> shellCommand(String command) {
