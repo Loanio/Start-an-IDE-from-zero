@@ -8,6 +8,7 @@ import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -34,6 +35,10 @@ public final class GitPlugin implements Plugin {
     private Subscription workspaceSubscription;
     private Label repoLabel;
     private Label commandLabel;
+    private Label branchLabel;
+    private Label changesLabel;
+    private Label remoteLabel;
+    private TextField commitMessageField;
     private TextArea output;
 
     @Override
@@ -80,25 +85,38 @@ public final class GitPlugin implements Plugin {
         repoLabel.getStyleClass().add("plugin-path-label");
         repoLabel.setWrapText(true);
 
-        Button status = new Button("Status");
-        status.getStyleClass().add("plugin-primary-button");
-        status.setOnAction(ignored -> runGit("status", "--short", "--branch"));
+        branchLabel = new Label("-");
+        changesLabel = new Label("-");
+        remoteLabel = new Label("-");
+        HBox summary = new HBox(6,
+                summaryCard("Branch", branchLabel),
+                summaryCard("Changes", changesLabel),
+                summaryCard("Remote", remoteLabel));
+        summary.getStyleClass().add("git-summary-grid");
 
-        Button log = new Button("Log");
-        log.getStyleClass().add("plugin-quiet-button");
-        log.setOnAction(ignored -> runGit("log", "--oneline", "-10"));
+        Button status = button("Status", "plugin-primary-button", () -> runGit("status", "--short", "--branch"));
+        Button log = button("Log", "plugin-quiet-button", () -> runGit("log", "--oneline", "-10"));
+        Button diff = button("Diff", "plugin-quiet-button", () -> runGit("diff", "--stat"));
+        Button branch = button("Branch", "plugin-quiet-button", () -> runGit("branch", "-vv"));
+        HBox inspectActions = new HBox(6, status, log, diff, branch);
+        inspectActions.getStyleClass().add("plugin-toolbar");
 
-        Button diff = new Button("Diff");
-        diff.getStyleClass().add("plugin-quiet-button");
-        diff.setOnAction(ignored -> runGit("diff", "--stat"));
+        Button fetch = button("Fetch", "plugin-quiet-button", () -> runGit("fetch", "--all", "--prune"));
+        Button pull = button("Pull", "plugin-quiet-button", () -> runGit("pull", "--ff-only"));
+        Button push = button("Push", "plugin-quiet-button", () -> runGit("push"));
+        Button addAll = button("Add All", "plugin-quiet-button", () -> runGit("add", "-A"));
+        HBox syncActions = new HBox(6, fetch, pull, push, addAll);
+        syncActions.getStyleClass().add("plugin-toolbar");
 
-        Button branch = new Button("Branch");
-        branch.getStyleClass().add("plugin-quiet-button");
-        branch.setOnAction(ignored -> runGit("branch", "--show-current"));
+        commitMessageField = new TextField();
+        commitMessageField.setPromptText("Commit message");
+        commitMessageField.getStyleClass().add("plugin-command-field");
+        HBox.setHgrow(commitMessageField, Priority.ALWAYS);
+        Button commit = button("Commit", "plugin-primary-button", this::commit);
+        HBox commitActions = new HBox(6, commitMessageField, commit);
+        commitActions.getStyleClass().add("plugin-toolbar");
 
-        HBox actions = new HBox(6, status, log, diff, branch);
-        actions.getStyleClass().add("plugin-toolbar");
-        VBox panel = new VBox(8, header, repoLabel, actions);
+        VBox panel = new VBox(8, header, repoLabel, summary, inspectActions, syncActions, commitActions);
         panel.getStyleClass().add("plugin-panel");
         return panel;
     }
@@ -123,11 +141,23 @@ public final class GitPlugin implements Plugin {
         return panel;
     }
 
+    private void commit() {
+        String message = commitMessageField.getText();
+        if (message == null || message.isBlank()) {
+            commandLabel.setText("message required");
+            setOutput("Enter a commit message before committing.");
+            context.notifications().updateStatusItem(STATUS_ID, "Commit message required");
+            return;
+        }
+        runGit("commit", "-m", message.strip());
+    }
+
     private void runGit(String... args) {
         Optional<Path> repository = findRepository();
         if (repository.isEmpty()) {
             repoLabel.setText("No repository");
             commandLabel.setText("not found");
+            setSummary("-", "-", "-");
             setOutput("No Git repository found from the current file or working directory.");
             context.notifications().updateStatusItem(STATUS_ID, "No repository");
             return;
@@ -142,6 +172,7 @@ public final class GitPlugin implements Plugin {
             command.add("git");
             command.addAll(Arrays.asList(args));
             String result = runCommand(repo, command);
+            refreshSummary(repo);
             setOutput("$ " + String.join(" ", command) + System.lineSeparator() + System.lineSeparator() + result);
             context.notifications().updateStatusItem(STATUS_ID, "Git done");
         }, "zero-ide-git-plugin");
@@ -150,6 +181,14 @@ public final class GitPlugin implements Plugin {
     }
 
     private String runCommand(Path repo, List<String> command) {
+        String result = runCommandRaw(repo, command);
+        if (result.isBlank()) {
+            return "No output." + System.lineSeparator();
+        }
+        return result;
+    }
+
+    private String runCommandRaw(Path repo, List<String> command) {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(repo.toFile());
         builder.redirectErrorStream(true);
@@ -165,9 +204,6 @@ public final class GitPlugin implements Plugin {
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 result.append("Exit code: ").append(exitCode).append(System.lineSeparator());
-            }
-            if (result.isEmpty()) {
-                result.append("No output.").append(System.lineSeparator());
             }
             return result.toString();
         } catch (IOException ex) {
@@ -195,8 +231,50 @@ public final class GitPlugin implements Plugin {
         return Optional.empty();
     }
 
+    private void refreshSummary(Path repo) {
+        String branch = firstLine(runCommandRaw(repo, List.of("git", "branch", "--show-current"))).orElse("detached");
+        long changes = runCommandRaw(repo, List.of("git", "status", "--porcelain")).lines()
+                .filter(line -> !line.isBlank())
+                .count();
+        String remote = firstLine(runCommandRaw(repo, List.of("git", "remote"))).orElse("none");
+        setSummary(branch.isBlank() ? "detached" : branch, changes == 1 ? "1 file" : changes + " files", remote);
+    }
+
+    private void setSummary(String branch, String changes, String remote) {
+        Platform.runLater(() -> {
+            branchLabel.setText(branch);
+            changesLabel.setText(changes);
+            remoteLabel.setText(remote);
+        });
+    }
+
     private void setOutput(String text) {
         Platform.runLater(() -> output.setText(text));
+    }
+
+    private static Optional<String> firstLine(String text) {
+        return text.lines()
+                .map(String::strip)
+                .filter(line -> !line.isBlank() && !line.startsWith("Exit code:"))
+                .findFirst();
+    }
+
+    private static VBox summaryCard(String labelText, Label value) {
+        Label label = new Label(labelText);
+        label.getStyleClass().add("git-summary-label");
+        value.getStyleClass().add("git-summary-value");
+        VBox card = new VBox(3, label, value);
+        card.getStyleClass().add("git-summary-card");
+        card.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(card, Priority.ALWAYS);
+        return card;
+    }
+
+    private static Button button(String text, String styleClass, Runnable action) {
+        Button button = new Button(text);
+        button.getStyleClass().add(styleClass);
+        button.setOnAction(ignored -> action.run());
+        return button;
     }
 
     private static HBox spacer() {

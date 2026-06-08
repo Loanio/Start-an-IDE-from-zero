@@ -664,7 +664,8 @@
     -fx-font-size: 12px;
 }
 
-.plugin-panel .text-field.plugin-search-field {
+.plugin-panel .text-field.plugin-search-field,
+.plugin-panel .text-field.plugin-command-field {
     -fx-background-color: #161718;
     -fx-border-color: #343a40;
 }
@@ -769,6 +770,32 @@
 
 .plugin-output .text {
     -fx-fill: #d4d4d4;
+}
+
+.git-summary-grid {
+    -fx-alignment: center-left;
+    -fx-spacing: 6;
+}
+
+.git-summary-card {
+    -fx-background-color: #171819;
+    -fx-background-radius: 4;
+    -fx-border-color: #30363d;
+    -fx-border-radius: 4;
+    -fx-padding: 7 8;
+    -fx-min-width: 70;
+}
+
+.git-summary-label {
+    -fx-text-fill: #7f8b96;
+    -fx-font-size: 9.5px;
+    -fx-font-weight: 700;
+}
+
+.git-summary-value {
+    -fx-text-fill: #f0f3f6;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
 }
 
 .search-result-row {
@@ -915,16 +942,52 @@
     -fx-background-radius: 4;
 }
 
+.markdown-preview-shell .viewport,
+.markdown-preview-shell .content {
+    -fx-background-color: #18191a;
+}
+
 .markdown-heading {
     -fx-text-fill: #f3f3f3;
     -fx-font-weight: 700;
     -fx-padding: 3 0 2 0;
 }
 
+.markdown-heading-1 {
+    -fx-border-color: transparent transparent #343a40 transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 0 0 8 0;
+}
+
+.markdown-heading-2 {
+    -fx-text-fill: #dbeafe;
+}
+
+.markdown-heading-3 {
+    -fx-text-fill: #d1fae5;
+}
+
 .markdown-body {
     -fx-text-fill: #d8dee5;
     -fx-font-size: 13px;
     -fx-line-spacing: 2;
+}
+
+.markdown-list-row {
+    -fx-alignment: top-left;
+    -fx-spacing: 8;
+    -fx-padding: 1 0 1 4;
+}
+
+.markdown-list-marker {
+    -fx-min-width: 24;
+    -fx-pref-width: 24;
+    -fx-max-width: 24;
+    -fx-alignment: top-right;
+    -fx-text-fill: #4ec9b0;
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
 }
 
 .markdown-quote {
@@ -947,6 +1010,15 @@
     -fx-font-family: "Cascadia Mono", "Consolas", monospace;
     -fx-font-size: 12px;
     -fx-padding: 9 10;
+}
+
+.markdown-divider {
+    -fx-padding: 6 0;
+}
+
+.markdown-divider .line {
+    -fx-border-color: #343a40 transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
 }
 
 .markdown-muted {

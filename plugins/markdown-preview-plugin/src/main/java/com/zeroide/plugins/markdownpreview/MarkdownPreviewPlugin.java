@@ -10,6 +10,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -23,6 +24,7 @@ public final class MarkdownPreviewPlugin implements Plugin {
     private Subscription textSubscription;
     private Subscription fileSubscription;
     private Label blockCountLabel;
+    private Label fileLabel;
     private VBox previewContent;
 
     @Override
@@ -62,6 +64,10 @@ public final class MarkdownPreviewPlugin implements Plugin {
         HBox header = new HBox(title, spacer(), blockCountLabel);
         header.getStyleClass().add("plugin-panel-header");
 
+        fileLabel = new Label("Unsaved document");
+        fileLabel.getStyleClass().addAll("plugin-panel-meta", "plugin-path-label");
+        fileLabel.setWrapText(true);
+
         Button refresh = new Button("Refresh");
         refresh.getStyleClass().add("plugin-quiet-button");
         refresh.setOnAction(ignored -> render());
@@ -77,7 +83,7 @@ public final class MarkdownPreviewPlugin implements Plugin {
         scrollPane.getStyleClass().add("markdown-preview-shell");
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
-        VBox panel = new VBox(8, header, actions, scrollPane);
+        VBox panel = new VBox(8, header, fileLabel, actions, scrollPane);
         panel.getStyleClass().add("plugin-panel");
         return panel;
     }
@@ -87,6 +93,9 @@ public final class MarkdownPreviewPlugin implements Plugin {
             return;
         }
         previewContent.getChildren().clear();
+        fileLabel.setText(context.editor().getCurrentFile()
+                .map(path -> path.getFileName() == null ? path.toString() : path.getFileName().toString())
+                .orElse("Unsaved document"));
         String[] lines = context.editor().getText().split("\\R", -1);
         StringBuilder codeBlock = new StringBuilder();
         boolean inCode = false;
@@ -144,13 +153,21 @@ public final class MarkdownPreviewPlugin implements Plugin {
                 default -> 14;
             };
             label.getStyleClass().add("markdown-heading");
+            label.getStyleClass().add("markdown-heading-" + level);
             label.setStyle("-fx-font-size: " + size + "px;");
             return label;
         }
+        if (stripped.matches("-{3,}|\\*{3,}|_{3,}")) {
+            Separator separator = new Separator();
+            separator.getStyleClass().add("markdown-divider");
+            return separator;
+        }
         if (stripped.startsWith("- ") || stripped.startsWith("* ")) {
-            Label label = label("- " + stripped.substring(2).strip());
-            label.getStyleClass().add("markdown-body");
-            return label;
+            return listItem("-", stripped.substring(2).strip());
+        }
+        if (stripped.matches("\\d+\\.\\s+.*")) {
+            int dot = stripped.indexOf('.');
+            return listItem(stripped.substring(0, dot + 1), stripped.substring(dot + 1).strip());
         }
         if (stripped.startsWith(">")) {
             Label label = label(stripped.substring(1).strip());
@@ -181,6 +198,17 @@ public final class MarkdownPreviewPlugin implements Plugin {
         Label label = label(text.isEmpty() ? " " : text);
         label.getStyleClass().add("markdown-code");
         return label;
+    }
+
+    private static HBox listItem(String markerText, String text) {
+        Label marker = new Label(markerText);
+        marker.getStyleClass().add("markdown-list-marker");
+        Label body = label(text);
+        body.getStyleClass().add("markdown-body");
+        HBox row = new HBox(8, marker, body);
+        row.getStyleClass().add("markdown-list-row");
+        HBox.setHgrow(body, Priority.ALWAYS);
+        return row;
     }
 
     private static HBox spacer() {
