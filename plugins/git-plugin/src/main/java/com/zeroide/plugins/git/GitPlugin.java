@@ -71,11 +71,13 @@ public final class GitPlugin implements Plugin {
         title.getStyleClass().add("plugin-panel-title");
         commandLabel = new Label("status");
         commandLabel.getStyleClass().add("plugin-panel-meta");
+        commandLabel.getStyleClass().add("plugin-status-chip");
         HBox header = new HBox(title, spacer(), commandLabel);
         header.getStyleClass().add("plugin-panel-header");
 
         repoLabel = new Label("No repository");
         repoLabel.getStyleClass().add("plugin-panel-meta");
+        repoLabel.getStyleClass().add("plugin-path-label");
         repoLabel.setWrapText(true);
 
         Button status = new Button("Status");
@@ -106,6 +108,7 @@ public final class GitPlugin implements Plugin {
         title.getStyleClass().add("plugin-panel-title");
         Label hint = new Label("Command output");
         hint.getStyleClass().add("plugin-panel-meta");
+        hint.getStyleClass().add("plugin-status-chip");
         HBox header = new HBox(title, spacer(), hint);
         header.getStyleClass().add("plugin-panel-header");
 

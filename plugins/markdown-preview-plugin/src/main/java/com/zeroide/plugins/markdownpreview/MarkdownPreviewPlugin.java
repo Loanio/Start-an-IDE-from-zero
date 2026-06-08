@@ -58,6 +58,7 @@ public final class MarkdownPreviewPlugin implements Plugin {
         title.getStyleClass().add("plugin-panel-title");
         blockCountLabel = new Label("0 blocks");
         blockCountLabel.getStyleClass().add("plugin-panel-meta");
+        blockCountLabel.getStyleClass().add("plugin-status-chip");
         HBox header = new HBox(title, spacer(), blockCountLabel);
         header.getStyleClass().add("plugin-panel-header");
 
@@ -73,6 +74,7 @@ public final class MarkdownPreviewPlugin implements Plugin {
 
         ScrollPane scrollPane = new ScrollPane(previewContent);
         scrollPane.setFitToWidth(true);
+        scrollPane.getStyleClass().add("markdown-preview-shell");
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
         VBox panel = new VBox(8, header, actions, scrollPane);

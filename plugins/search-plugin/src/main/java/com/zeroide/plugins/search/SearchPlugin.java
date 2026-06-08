@@ -77,19 +77,23 @@ public final class SearchPlugin implements Plugin {
         title.getStyleClass().add("plugin-panel-title");
         countLabel = new Label("0 matches");
         countLabel.getStyleClass().add("plugin-panel-meta");
+        countLabel.getStyleClass().add("plugin-status-chip");
         HBox header = new HBox(title, spacer(), countLabel);
         header.getStyleClass().add("plugin-panel-header");
         scopeLabel = new Label();
         scopeLabel.getStyleClass().add("plugin-panel-meta");
+        scopeLabel.getStyleClass().add("plugin-path-label");
         scopeLabel.setWrapText(true);
         updateScopeLabel();
 
         queryField = new TextField();
         queryField.setPromptText("Find");
+        queryField.getStyleClass().add("plugin-search-field");
         queryField.textProperty().addListener((ignored, oldValue, newValue) -> search());
 
         replacementField = new TextField();
         replacementField.setPromptText("Replace");
+        replacementField.getStyleClass().add("plugin-search-field");
 
         caseSensitive = new CheckBox("Aa");
         caseSensitive.getStyleClass().add("plugin-toggle");
@@ -128,12 +132,16 @@ public final class SearchPlugin implements Plugin {
                 line.getStyleClass().add("search-line-badge");
                 Label snippet = new Label(hit.label());
                 snippet.getStyleClass().add("search-snippet");
+                snippet.setWrapText(true);
+                snippet.setMaxWidth(Double.MAX_VALUE);
                 HBox row = new HBox(8, line, snippet);
                 row.getStyleClass().add("search-result-row");
+                HBox.setHgrow(snippet, Priority.ALWAYS);
                 setText(null);
                 setGraphic(row);
             }
         });
+        results.getStyleClass().add("search-results-list");
         results.setOnMouseClicked(ignored -> selectCurrentHit());
 
         VBox panel = new VBox(8, header, scopeLabel, queryField, replacementField, actions, results);
