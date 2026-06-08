@@ -9,7 +9,6 @@ import com.zeroide.api.events.TextChangedEvent;
 import com.zeroide.api.events.WorkspaceChangedEvent;
 import com.zeroide.core.editor.RichCodeEditor;
 import com.zeroide.core.plugins.DynamicPluginManager;
-import com.zeroide.core.plugins.LoadedPlugin;
 import com.zeroide.core.services.CoreContainer;
 import com.zeroide.core.services.JavaFxEditorService;
 import javafx.application.Application;
@@ -27,7 +26,6 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.Separator;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TabPane;
@@ -60,7 +58,6 @@ public final class ZeroIdeApp extends Application {
     private Label workspaceLabel;
     private Label projectNameLabel;
     private Label metricsLabel;
-    private ListView<LoadedPlugin> pluginList;
     private TabPane sidebarPanelTabs;
     private TabPane toolPanelTabs;
     private TabPane bottomPanelTabs;
@@ -84,8 +81,8 @@ public final class ZeroIdeApp extends Application {
     private boolean sidebarVisible = true;
     private boolean toolPanelVisible = true;
     private boolean bottomPanelVisible = true;
-    private double sidebarDividerPosition = 0.22;
-    private double toolPanelDividerPosition = 0.72;
+    private double sidebarDividerPosition = 0.20;
+    private double toolPanelDividerPosition = 0.78;
     private double bottomDividerPosition = 0.68;
     private double dragOffsetX;
     private double dragOffsetY;
@@ -101,7 +98,6 @@ public final class ZeroIdeApp extends Application {
         MenuBar menuBar = new MenuBar();
         editor = buildEditor();
         HBox statusBar = buildStatusBar();
-        pluginList = buildPluginList();
         sidebarPanelTabs = buildSidebarPanelTabs();
         toolPanelTabs = buildToolPanelTabs();
         bottomPanelTabs = buildBottomPanelTabs();
@@ -111,7 +107,7 @@ public final class ZeroIdeApp extends Application {
         pluginManager = container.getBean(DynamicPluginManager.class);
         editorService = (JavaFxEditorService) container.getBean(EditorService.class);
         workspaceService = container.getBean(WorkspaceService.class);
-        commandService = container.getBean(CommandService.class);
+        commandService = container.getBean(com.zeroide.core.services.JavaFxUiService.class);
 
         configureCoreCommands(stage);
         configureMenus(menuBar, stage);
@@ -141,7 +137,6 @@ public final class ZeroIdeApp extends Application {
         stage.show();
 
         pluginManager.loadAll();
-        refreshPluginList();
         updateMetrics();
         updateWorkspaceLabel();
     }
@@ -260,24 +255,32 @@ public final class ZeroIdeApp extends Application {
         workspaceBodySplitPane.setOrientation(Orientation.VERTICAL);
         workspaceBodySplitPane.getStyleClass().add("workspace-body-split");
 
+        configureResizableWorkspace();
         updateWorkspacePanels();
         return workspaceShell;
     }
 
+    private void configureResizableWorkspace() {
+        editor.setMinWidth(120);
+        sidebar.setMinWidth(96);
+        sidebar.setPrefWidth(260);
+        sidebar.setMaxWidth(Double.MAX_VALUE);
+        toolPanelHost.setMinWidth(128);
+        toolPanelHost.setPrefWidth(320);
+        toolPanelHost.setMaxWidth(Double.MAX_VALUE);
+        bottomPanelHost.setMinHeight(110);
+        bottomPanelHost.setPrefHeight(230);
+        bottomPanelHost.setMaxHeight(Double.MAX_VALUE);
+
+        SplitPane.setResizableWithParent(editor, true);
+        SplitPane.setResizableWithParent(sidebar, true);
+        SplitPane.setResizableWithParent(toolPanelHost, true);
+        SplitPane.setResizableWithParent(bottomPanelHost, true);
+    }
+
     private BorderPane buildToolPanelHost() {
-        Label title = new Label("TOOLS");
-        title.getStyleClass().add("side-panel-title");
-
-        Button collapse = sideToggleButton(">", "Hide right tools");
-        collapse.getStyleClass().add("side-collapse-button");
-        collapse.setOnAction(ignored -> toggleToolPanel());
-
-        HBox header = new HBox(title, spacer(), collapse);
-        header.getStyleClass().add("side-panel-header");
-
         BorderPane host = new BorderPane();
         host.getStyleClass().add("tool-panel-host");
-        host.setTop(header);
         host.setCenter(toolPanelTabs);
         return host;
     }
@@ -285,32 +288,23 @@ public final class ZeroIdeApp extends Application {
     private TabPane buildToolPanelTabs() {
         TabPane tabs = new TabPane();
         tabs.getStyleClass().add("tool-tabs");
-        tabs.setMinWidth(300);
-        tabs.setPrefWidth(360);
+        tabs.setMinWidth(0);
+        tabs.setPrefWidth(320);
+        tabs.setMaxWidth(Double.MAX_VALUE);
         return tabs;
     }
 
     private TabPane buildSidebarPanelTabs() {
         TabPane tabs = new TabPane();
         tabs.getStyleClass().add("sidebar-tabs");
+        tabs.setMinWidth(0);
         tabs.setMinHeight(220);
         return tabs;
     }
 
     private BorderPane buildBottomPanelHost() {
-        Label title = new Label("PANEL");
-        title.getStyleClass().add("side-panel-title");
-
-        Button collapse = sideToggleButton("v", "Hide bottom panel");
-        collapse.getStyleClass().add("side-collapse-button");
-        collapse.setOnAction(ignored -> toggleBottomPanel());
-
-        HBox header = new HBox(title, spacer(), collapse);
-        header.getStyleClass().add("bottom-panel-header");
-
         BorderPane host = new BorderPane();
         host.getStyleClass().add("bottom-panel-host");
-        host.setTop(header);
         host.setCenter(bottomPanelTabs);
         return host;
     }
@@ -475,52 +469,10 @@ public final class ZeroIdeApp extends Application {
         projectNameLabel = new Label("No workspace");
         projectNameLabel.getStyleClass().add("project-name");
 
-        Label pluginTitle = new Label("PLUGINS");
-        pluginTitle.getStyleClass().add("sidebar-title");
-
-        Button loadJarButton = new Button("Load Jar");
-        loadJarButton.setMaxWidth(Double.MAX_VALUE);
-        loadJarButton.setOnAction(ignored -> chooseAndLoadPlugin());
-
-        Button unloadButton = new Button("Unload");
-        unloadButton.setMaxWidth(Double.MAX_VALUE);
-        unloadButton.setOnAction(ignored -> unloadSelectedPlugin());
-
-        Button refreshButton = new Button("Refresh");
-        refreshButton.setMaxWidth(Double.MAX_VALUE);
-        refreshButton.setOnAction(ignored -> {
-            pluginManager.loadAll();
-            refreshPluginList();
-        });
-
-        HBox pluginActions = new HBox(8, loadJarButton, unloadButton, refreshButton);
-        pluginActions.getStyleClass().add("plugin-actions");
-        HBox.setHgrow(loadJarButton, Priority.ALWAYS);
-        HBox.setHgrow(unloadButton, Priority.ALWAYS);
-        HBox.setHgrow(refreshButton, Priority.ALWAYS);
-
-        VBox sidebar = new VBox(10, explorerHeader, projectNameLabel, sidebarPanelTabs, new Separator(Orientation.HORIZONTAL), pluginTitle, pluginList, pluginActions);
+        VBox sidebar = new VBox(6, explorerHeader, projectNameLabel, sidebarPanelTabs);
         sidebar.getStyleClass().add("sidebar");
         VBox.setVgrow(sidebarPanelTabs, Priority.ALWAYS);
-        VBox.setVgrow(pluginList, Priority.ALWAYS);
         return sidebar;
-    }
-
-    private ListView<LoadedPlugin> buildPluginList() {
-        ListView<LoadedPlugin> listView = new ListView<>();
-        listView.getStyleClass().add("plugin-list");
-        listView.setCellFactory(ignored -> new ListCell<>() {
-            @Override
-            protected void updateItem(LoadedPlugin plugin, boolean empty) {
-                super.updateItem(plugin, empty);
-                if (empty || plugin == null) {
-                    setText(null);
-                } else {
-                    setText(plugin.descriptor().name() + "  " + plugin.descriptor().version());
-                }
-            }
-        });
-        return listView;
     }
 
     private HBox buildStatusBar() {
@@ -556,11 +508,11 @@ public final class ZeroIdeApp extends Application {
         commandService.registerCommand("core.view.toggle-sidebar", "View: Toggle Sidebar", "Shortcut+B", this::toggleSidebar);
         commandService.registerCommand("core.view.toggle-tools", "View: Toggle Tools", "Shortcut+Shift+B", this::toggleToolPanel);
         commandService.registerCommand("core.view.toggle-bottom-panel", "View: Toggle Bottom Panel", "Shortcut+J", this::toggleBottomPanel);
+        commandService.registerCommand("core.plugins.load-jar", "Plugins: Load Jar", () -> chooseAndLoadPlugin());
         commandService.registerCommand("core.plugins.load-all", "Plugins: Load All", () -> {
             pluginManager.loadAll();
-            refreshPluginList();
         });
-        commandService.registerCommand("core.plugins.unload-selected", "Plugins: Unload Selected", this::unloadSelectedPlugin);
+        commandService.registerCommand("core.plugins.unload-all", "Plugins: Unload All", () -> pluginManager.unloadAll());
     }
 
     private void configureMenus(MenuBar menuBar, Stage stage) {
@@ -577,9 +529,10 @@ public final class ZeroIdeApp extends Application {
         fileMenu.getItems().addAll(newFile, open, openFolder, recentWorkspacesMenu, new SeparatorMenuItem(), save, saveAs, new SeparatorMenuItem(), exit);
 
         Menu pluginMenu = new Menu("Plugins");
+        MenuItem loadJar = commandItem("core.plugins.load-jar");
         MenuItem loadAll = commandItem("core.plugins.load-all");
-        MenuItem unloadSelected = commandItem("core.plugins.unload-selected");
-        pluginMenu.getItems().addAll(loadAll, unloadSelected);
+        MenuItem unloadAll = commandItem("core.plugins.unload-all");
+        pluginMenu.getItems().addAll(loadJar, loadAll, unloadAll);
 
         Menu viewMenu = new Menu("View");
         MenuItem commandPalette = commandItem("core.command-palette.show");
@@ -655,21 +608,7 @@ public final class ZeroIdeApp extends Application {
         var file = chooser.showOpenDialog(editor.getScene().getWindow());
         if (file != null) {
             pluginManager.load(file.toPath());
-            refreshPluginList();
         }
-    }
-
-    private void unloadSelectedPlugin() {
-        LoadedPlugin selected = pluginList.getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            pluginManager.unload(selected.descriptor().id());
-            refreshPluginList();
-        }
-    }
-
-    private void refreshPluginList() {
-        List<LoadedPlugin> loaded = pluginManager.loadedPlugins();
-        pluginList.setItems(FXCollections.observableArrayList(loaded));
     }
 
     private void updateMetrics() {
@@ -858,10 +797,10 @@ public final class ZeroIdeApp extends Application {
     }
 
     private static double clampDivider(double position) {
-        return Math.max(0.12, Math.min(0.88, position));
+        return Math.max(0.04, Math.min(0.96, position));
     }
 
     private static double clampBottomDivider(double position) {
-        return Math.max(0.45, Math.min(0.86, position));
+        return Math.max(0.30, Math.min(0.92, position));
     }
 }

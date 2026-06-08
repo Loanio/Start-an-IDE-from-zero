@@ -15,6 +15,7 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -223,6 +224,10 @@ public final class JavaFxUiService implements UIService {
         runOnFxThread(() -> {
             removePanel(id);
             boolean selectNewPanel = target.getTabs().isEmpty();
+            if (content instanceof Region region) {
+                region.setMinWidth(0);
+                region.setMaxWidth(Double.MAX_VALUE);
+            }
             Tab tab = new Tab(title, content);
             tab.setClosable(false);
             items.put(id, tab);

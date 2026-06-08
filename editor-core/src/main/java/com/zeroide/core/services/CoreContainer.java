@@ -1,12 +1,8 @@
 package com.zeroide.core.services;
 
-import com.zeroide.api.CommandService;
 import com.zeroide.api.EditorContext;
 import com.zeroide.api.EditorService;
 import com.zeroide.api.EventBus;
-import com.zeroide.api.NotificationService;
-import com.zeroide.api.PanelService;
-import com.zeroide.api.UIService;
 import com.zeroide.api.WorkspaceService;
 import com.zeroide.core.events.DefaultEventBus;
 import com.zeroide.core.editor.RichCodeEditor;
@@ -32,19 +28,18 @@ public final class CoreContainer implements AutoCloseable {
         context.registerBean(EditorService.class, () -> new JavaFxEditorService(editor, owner, context.getBean(EventBus.class)));
         context.registerBean(WorkspaceService.class, () -> new DefaultWorkspaceService(context.getBean(EventBus.class)));
         context.registerBean(JavaFxUiService.class, () -> new JavaFxUiService(menuBar, statusBar, sidebarPanels, toolPanels, bottomPanels));
-        context.registerBean(UIService.class, () -> context.getBean(JavaFxUiService.class));
-        context.registerBean(PanelService.class, () -> context.getBean(JavaFxUiService.class));
-        context.registerBean(CommandService.class, () -> context.getBean(JavaFxUiService.class));
-        context.registerBean(NotificationService.class, () -> context.getBean(JavaFxUiService.class));
-        context.registerBean(EditorContext.class, () -> new DefaultEditorContext(
-                context.getBean(EditorService.class),
-                context.getBean(EventBus.class),
-                context.getBean(UIService.class),
-                context.getBean(WorkspaceService.class),
-                context.getBean(PanelService.class),
-                context.getBean(CommandService.class),
-                context.getBean(NotificationService.class)
-        ));
+        context.registerBean(EditorContext.class, () -> {
+            JavaFxUiService uiService = context.getBean(JavaFxUiService.class);
+            return new DefaultEditorContext(
+                    context.getBean(EditorService.class),
+                    context.getBean(EventBus.class),
+                    uiService,
+                    context.getBean(WorkspaceService.class),
+                    uiService,
+                    uiService,
+                    uiService
+            );
+        });
         context.registerBean(DynamicPluginManager.class, () -> new DynamicPluginManager(
                 pluginDirectory,
                 context.getBean(EditorContext.class)

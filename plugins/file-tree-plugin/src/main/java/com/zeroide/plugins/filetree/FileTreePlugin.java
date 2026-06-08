@@ -5,16 +5,12 @@ import com.zeroide.api.Plugin;
 import com.zeroide.api.Subscription;
 import com.zeroide.api.events.FileOpenedEvent;
 import com.zeroide.api.events.WorkspaceChangedEvent;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.MouseButton;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.DirectoryChooser;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,7 +27,6 @@ public final class FileTreePlugin implements Plugin {
     private Subscription fileSubscription;
     private Subscription workspaceSubscription;
     private TreeView<Path> treeView;
-    private Label rootLabel;
 
     @Override
     public void onLoad(EditorContext context) {
@@ -64,29 +59,6 @@ public final class FileTreePlugin implements Plugin {
     }
 
     private VBox buildPanel() {
-        Label title = new Label("Files");
-        title.getStyleClass().add("plugin-panel-title");
-        rootLabel = new Label();
-        rootLabel.getStyleClass().add("plugin-panel-meta");
-        rootLabel.setWrapText(true);
-
-        HBox header = new HBox(title, spacer());
-        header.getStyleClass().add("plugin-panel-header");
-
-        Button choose = new Button("Open Folder");
-        choose.getStyleClass().add("plugin-primary-button");
-        choose.setOnAction(ignored -> chooseRoot());
-
-        Button refresh = new Button("Refresh");
-        refresh.getStyleClass().add("plugin-quiet-button");
-        refresh.setOnAction(ignored -> refresh());
-
-        Button current = new Button("Current File");
-        current.getStyleClass().add("plugin-quiet-button");
-        current.setOnAction(ignored -> setRootPath(initialRoot()));
-
-        HBox actions = new HBox(6, choose, refresh, current);
-        actions.getStyleClass().add("plugin-toolbar");
         treeView = new TreeView<>();
         treeView.setShowRoot(false);
         treeView.setCellFactory(ignored -> new PathCell());
@@ -96,23 +68,10 @@ public final class FileTreePlugin implements Plugin {
             }
         });
 
-        VBox panel = new VBox(8, header, rootLabel, actions, treeView);
-        panel.getStyleClass().add("plugin-panel");
+        VBox panel = new VBox(treeView);
+        panel.getStyleClass().addAll("plugin-panel", "file-tree-panel");
         VBox.setVgrow(treeView, Priority.ALWAYS);
         return panel;
-    }
-
-    private void chooseRoot() {
-        DirectoryChooser chooser = new DirectoryChooser();
-        chooser.setTitle("Choose Workspace Folder");
-        Path currentRoot = treeView.getRoot() == null ? null : treeView.getRoot().getValue();
-        if (currentRoot != null && Files.isDirectory(currentRoot)) {
-            chooser.setInitialDirectory(currentRoot.toFile());
-        }
-        var selected = chooser.showDialog(null);
-        if (selected != null) {
-            context.workspace().openWorkspace(selected.toPath());
-        }
     }
 
     private void refresh() {
@@ -124,7 +83,6 @@ public final class FileTreePlugin implements Plugin {
 
     private void setRootPath(Path root) {
         Path normalized = root.toAbsolutePath().normalize();
-        rootLabel.setText(normalized.toString());
         treeView.setRoot(new LazyPathItem(normalized));
         context.notifications().updateStatusItem(STATUS_ID, "Files " + normalized.getFileName());
     }
@@ -144,12 +102,6 @@ public final class FileTreePlugin implements Plugin {
                 .map(path -> Files.isDirectory(path) ? path : path.getParent())
                 .filter(path -> path != null && Files.isDirectory(path)))
                 .orElse(Path.of(System.getProperty("user.dir")));
-    }
-
-    private static HBox spacer() {
-        HBox spacer = new HBox();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        return spacer;
     }
 
     private static final class LazyPathItem extends TreeItem<Path> {
@@ -188,22 +140,16 @@ public final class FileTreePlugin implements Plugin {
         @Override
         protected void updateItem(Path path, boolean empty) {
             super.updateItem(path, empty);
+            getStyleClass().removeAll("file-folder", "file-leaf");
             if (empty || path == null) {
                 setText(null);
                 setGraphic(null);
                 return;
             }
             Path fileName = path.getFileName();
-            Label badge = new Label(Files.isDirectory(path) ? "DIR" : "FILE");
-            badge.getStyleClass().add(Files.isDirectory(path) ? "file-kind-folder" : "file-kind-file");
-
-            Label name = new Label(fileName == null ? path.toString() : fileName.toString());
-            name.getStyleClass().add("file-name");
-
-            HBox row = new HBox(8, badge, name);
-            row.getStyleClass().add("file-row");
-            setText(null);
-            setGraphic(row);
+            getStyleClass().add(Files.isDirectory(path) ? "file-folder" : "file-leaf");
+            setText(fileName == null ? path.toString() : fileName.toString());
+            setGraphic(null);
         }
     }
 }
