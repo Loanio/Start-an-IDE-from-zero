@@ -1,10 +1,117 @@
 .app-root {
     -fx-background-color: #1e1e1e;
+    -fx-background-insets: 0;
     -fx-font-family: "Segoe UI", "Inter", "Arial";
+}
+
+.window-chrome {
+    -fx-background-color: #181818;
+    -fx-background-insets: 0;
+}
+
+.title-bar {
+    -fx-background-color: #181818;
+    -fx-background-insets: 0;
+    -fx-border-color: #2d2d2d;
+    -fx-border-width: 0 0 1 0;
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-padding: 0 0 0 12;
+}
+
+.window-title {
+    -fx-text-fill: #d4d4d4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.window-controls {
+    -fx-background-color: transparent;
+}
+
+.window-controls .window-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-width: 0;
+    -fx-min-width: 46;
+    -fx-pref-width: 46;
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-padding: 0;
+}
+
+.window-controls .window-button:hover {
+    -fx-background-color: #2a2d2e;
+    -fx-text-fill: #ffffff;
+}
+
+.window-controls .close-button:hover {
+    -fx-background-color: #c42b1c;
+    -fx-text-fill: #ffffff;
+}
+
+.window-icon {
+    -fx-min-width: 14;
+    -fx-pref-width: 14;
+    -fx-max-width: 14;
+    -fx-min-height: 14;
+    -fx-pref-height: 14;
+    -fx-max-height: 14;
+}
+
+.minimize-icon .window-icon-shape {
+    -fx-background-color: #d4d4d4;
+    -fx-min-width: 10;
+    -fx-pref-width: 10;
+    -fx-max-width: 10;
+    -fx-min-height: 1.5;
+    -fx-pref-height: 1.5;
+    -fx-max-height: 1.5;
+}
+
+.maximize-icon .window-icon-shape {
+    -fx-background-color: transparent;
+    -fx-border-color: #d4d4d4;
+    -fx-border-width: 1.4;
+    -fx-min-width: 10;
+    -fx-pref-width: 10;
+    -fx-max-width: 10;
+    -fx-min-height: 9;
+    -fx-pref-height: 9;
+    -fx-max-height: 9;
+}
+
+.close-line {
+    -fx-background-color: #d4d4d4;
+    -fx-min-width: 12;
+    -fx-pref-width: 12;
+    -fx-max-width: 12;
+    -fx-min-height: 1.5;
+    -fx-pref-height: 1.5;
+    -fx-max-height: 1.5;
+}
+
+.close-line-first {
+    -fx-rotate: 45;
+}
+
+.close-line-second {
+    -fx-rotate: -45;
+}
+
+.window-controls .window-button:hover .minimize-icon .window-icon-shape,
+.window-controls .window-button:hover .close-line {
+    -fx-background-color: #ffffff;
+}
+
+.window-controls .window-button:hover .maximize-icon .window-icon-shape {
+    -fx-border-color: #ffffff;
 }
 
 .menu-bar {
     -fx-background-color: #181818;
+    -fx-background-insets: 0;
     -fx-border-color: #2d2d2d;
     -fx-border-width: 0 0 1 0;
 }
@@ -24,6 +131,8 @@
 
 .split-pane {
     -fx-background-color: #1e1e1e;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
 }
 
 .split-pane-divider {
@@ -80,16 +189,34 @@
 
 .code-editor {
     -fx-background-color: #1e1e1e;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
     -fx-control-inner-background: #1e1e1e;
     -fx-text-fill: #d4d4d4;
     -fx-highlight-fill: #264f78;
     -fx-highlight-text-fill: #ffffff;
     -fx-font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
     -fx-font-size: 14px;
+    -fx-padding: 0;
 }
 
+.code-editor .scroll-pane {
+    -fx-background-color: #1e1e1e;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.code-editor .scroll-pane .viewport {
+    -fx-background-color: #1e1e1e;
+}
+
+.code-editor .scroll-pane .content,
 .code-editor .content {
     -fx-background-color: #1e1e1e;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
 }
 
 .status-bar {

@@ -11,6 +11,7 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -23,13 +24,19 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
+import javafx.scene.image.Image;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -42,6 +49,8 @@ public final class ZeroIdeApp extends Application {
     private CoreContainer container;
     private DynamicPluginManager pluginManager;
     private JavaFxEditorService editorService;
+    private double dragOffsetX;
+    private double dragOffsetY;
 
     public static void main(String[] args) {
         launch(args);
@@ -49,6 +58,8 @@ public final class ZeroIdeApp extends Application {
 
     @Override
     public void start(Stage stage) {
+        stage.initStyle(StageStyle.UNDECORATED);
+
         MenuBar menuBar = new MenuBar();
         editor = buildEditor();
         HBox statusBar = buildStatusBar();
@@ -64,20 +75,100 @@ public final class ZeroIdeApp extends Application {
 
         BorderPane root = new BorderPane();
         root.getStyleClass().add("app-root");
-        root.setTop(menuBar);
+        VBox windowChrome = new VBox(buildTitleBar(stage), menuBar);
+        windowChrome.getStyleClass().add("window-chrome");
+        root.setTop(windowChrome);
         root.setCenter(buildWorkspace());
         root.setBottom(statusBar);
 
         Scene scene = new Scene(root, 1180, 760);
+        scene.setFill(Color.web("#1e1e1e"));
         scene.getStylesheets().add(getClass().getResource("/styles/app.css").toExternalForm());
 
         stage.setTitle("Zero IDE");
+        configureWindowIcon(stage);
         stage.setScene(scene);
         stage.show();
 
         pluginManager.loadAll();
         refreshPluginList();
         updateMetrics();
+    }
+
+    private void configureWindowIcon(Stage stage) {
+        var iconUrl = getClass().getResource("/icons/zero-ide.png");
+        if (iconUrl != null) {
+            stage.getIcons().add(new Image(iconUrl.toExternalForm()));
+        }
+    }
+
+    private HBox buildTitleBar(Stage stage) {
+        Label title = new Label("Zero IDE");
+        title.getStyleClass().add("window-title");
+
+        HBox spacer = new HBox();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button minimize = windowButton("minimize", "Minimize");
+        minimize.setOnAction(ignored -> stage.setIconified(true));
+
+        Button maximize = windowButton("maximize", "Maximize or restore");
+        maximize.setOnAction(ignored -> stage.setMaximized(!stage.isMaximized()));
+
+        Button close = windowButton("close", "Close");
+        close.getStyleClass().add("close-button");
+        close.setOnAction(ignored -> Platform.exit());
+
+        HBox controls = new HBox(minimize, maximize, close);
+        controls.getStyleClass().add("window-controls");
+
+        HBox titleBar = new HBox(title, spacer, controls);
+        titleBar.getStyleClass().add("title-bar");
+        titleBar.setAlignment(Pos.CENTER_LEFT);
+        titleBar.setOnMousePressed(event -> {
+            dragOffsetX = event.getScreenX() - stage.getX();
+            dragOffsetY = event.getScreenY() - stage.getY();
+        });
+        titleBar.setOnMouseDragged(event -> {
+            if (!stage.isMaximized()) {
+                stage.setX(event.getScreenX() - dragOffsetX);
+                stage.setY(event.getScreenY() - dragOffsetY);
+            }
+        });
+        titleBar.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                stage.setMaximized(!stage.isMaximized());
+            }
+        });
+        return titleBar;
+    }
+
+    private Button windowButton(String iconName, String tooltip) {
+        Button button = new Button();
+        button.getStyleClass().add("window-button");
+        button.setGraphic(windowIcon(iconName));
+        button.setTooltip(new Tooltip(tooltip));
+        button.setFocusTraversable(false);
+        return button;
+    }
+
+    private StackPane windowIcon(String iconName) {
+        StackPane icon = new StackPane();
+        icon.getStyleClass().addAll("window-icon", iconName + "-icon");
+
+        if ("close".equals(iconName)) {
+            Region firstLine = new Region();
+            firstLine.getStyleClass().addAll("close-line", "close-line-first");
+            Region secondLine = new Region();
+            secondLine.getStyleClass().addAll("close-line", "close-line-second");
+            icon.getChildren().addAll(firstLine, secondLine);
+        } else {
+            Region shape = new Region();
+            shape.getStyleClass().add("window-icon-shape");
+            icon.getChildren().add(shape);
+        }
+
+        return icon;
     }
 
     @Override
