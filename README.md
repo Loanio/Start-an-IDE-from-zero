@@ -20,6 +20,7 @@ Zero IDE 是一个基于 Java 21、Gradle、JavaFX 的小型插件化文本编�
 zero-ide
 ├── editor-api                 # 插件 API、事件、核心服务接口
 ├── editor-core                # JavaFX 应用、插件管理器、事件总线、文件服务
+├── vscode-compat              # VS Code .vsix 静态贡献解析与导入适配层
 └── plugins
     ├── word-count-plugin      # 字数统计状态栏插件
     ├── java-language-plugin   # Java 文件类型与语法高亮插件
@@ -97,6 +98,30 @@ public interface Plugin {
 - `JavaFxUiService` 允许插件添加状态栏项、菜单项、工具面板和信息弹窗。
 - `LanguageService`、`HighlightingService` 和 `SnippetService` 允许插件动态注册文件类型、语法高亮和代码片段。
 - 卸载插件时会调用 `onUnload()`，移除 UI 扩展，并关闭对应 `URLClassLoader`。
+
+## VS Code 插件兼容层
+
+`vscode-compat` 模块提供第一阶段 VS Code 插件兼容能力。当前目标是“看懂并导入一部分静态资源插件”，不是完整运行 VS Code 插件。
+
+已支持：
+
+- 读取 `.vsix` 中的 `extension/package.json` 或根目录 `package.json`。
+- 解析 VS Code 插件基础元数据：`name`、`displayName`、`version`、`publisher`、`description`、`engines.vscode`、`main`、`browser`、`activationEvents`。
+- 解析静态贡献：`contributes.commands`、`contributes.languages`、`contributes.grammars`、`contributes.snippets`、`contributes.themes`。
+- 将静态贡献映射为 `VsCodeStaticContributionPlan`，供后续接入 Zero IDE 的语言、片段、主题服务。
+- 安装 `.vsix` 到本地目录，并防护不安全压缩包路径。
+
+当前限制：
+
+- 带 `main` 或 `browser` JavaScript 入口的 VS Code 插件会被标记为 executable extension，目前只支持读取它的静态贡献。
+- 暂未实现 Node.js Extension Host，也未实现 `vscode` JavaScript API shim。
+- 暂未把 TextMate grammar、snippet 和 theme 直接渲染到编辑器 UI，当前只完成解析和映射层。
+
+后续可以在此基础上继续接入：
+
+- `LanguageService` / `SnippetService` / `ThemeService` 注册表。
+- 插件管理 UI，展示 VS Code 插件兼容状态。
+- 实验性 Node.js extension host，用于支持少量简单 JS 插件。
 
 ## 测试
 

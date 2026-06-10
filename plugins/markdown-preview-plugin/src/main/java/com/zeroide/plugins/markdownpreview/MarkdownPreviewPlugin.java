@@ -15,6 +15,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
+import java.nio.file.Path;
+import java.util.Locale;
+import java.util.Optional;
+
 public final class MarkdownPreviewPlugin implements Plugin {
     private static final String PANEL_ID = "plugin.markdown-preview.panel";
     private static final String STATUS_ID = "plugin.markdown-preview.status";
@@ -93,9 +97,20 @@ public final class MarkdownPreviewPlugin implements Plugin {
             return;
         }
         previewContent.getChildren().clear();
-        fileLabel.setText(context.editor().getCurrentFile()
-                .map(path -> path.getFileName() == null ? path.toString() : path.getFileName().toString())
+        Optional<Path> currentFile = context.editor().getCurrentFile();
+        fileLabel.setText(currentFile
+                .map(MarkdownPreviewPlugin::displayName)
                 .orElse("Unsaved document"));
+
+        if (currentFile.isPresent() && !isMarkdownFile(currentFile.get())) {
+            Label unsupported = label("Markdown preview is only available for Markdown files.");
+            unsupported.getStyleClass().add("markdown-muted");
+            previewContent.getChildren().add(unsupported);
+            blockCountLabel.setText("0 blocks");
+            context.notifications().updateStatusItem(STATUS_ID, "Not a Markdown file");
+            return;
+        }
+
         String[] lines = context.editor().getText().split("\\R", -1);
         StringBuilder codeBlock = new StringBuilder();
         boolean inCode = false;
@@ -135,6 +150,19 @@ public final class MarkdownPreviewPlugin implements Plugin {
 
         blockCountLabel.setText(previewContent.getChildren().size() + " blocks");
         context.notifications().updateStatusItem(STATUS_ID, previewContent.getChildren().size() + " blocks");
+    }
+
+    private static boolean isMarkdownFile(Path path) {
+        String fileName = displayName(path).toLowerCase(Locale.ROOT);
+        return fileName.endsWith(".md")
+                || fileName.endsWith(".markdown")
+                || fileName.endsWith(".mdown")
+                || fileName.endsWith(".mkd");
+    }
+
+    private static String displayName(Path path) {
+        Path fileName = path.getFileName();
+        return fileName == null ? path.toString() : fileName.toString();
     }
 
     private static Node renderLine(String line) {
