@@ -26,6 +26,7 @@ public final class JavaFxEditorService implements EditorService {
     private final EventBus eventBus;
     private final LanguageService languageService;
     private Path currentFile;
+    private String currentLanguageId;
 
     public JavaFxEditorService(RichCodeEditor editor, Window owner, EventBus eventBus, LanguageService languageService) {
         this.editor = editor;
@@ -109,6 +110,15 @@ public final class JavaFxEditorService implements EditorService {
         String languageId = languageService.detectLanguage(currentFile)
                 .map(language -> language.id())
                 .orElse(null);
+        setLanguageId(languageId);
+    }
+
+    public Optional<String> getLanguageId() {
+        return Optional.ofNullable(currentLanguageId);
+    }
+
+    public void setLanguageId(String languageId) {
+        currentLanguageId = languageId;
         runOnFxThread(() -> editor.setLanguageId(languageId));
     }
 

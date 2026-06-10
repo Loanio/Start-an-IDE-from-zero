@@ -58,6 +58,8 @@ build/runtime/plugins
 
 插件可以在界面中通过 `Plugins -> Manage Plugins` 打开管理面板，查看已加载插件并单独卸载。卸载依赖插件时，依赖它的插件会自动一起卸载。
 
+状态栏会显示当前文件语言，例如 `Lang: Java`、`Lang: Markdown`、`Lang: JSON` 或 `Lang: Plain Text`。点击该状态项可以手动切换当前文件的高亮语言。
+
 如果你已经全局安装了 Gradle，也可以使用：
 
 ```bash

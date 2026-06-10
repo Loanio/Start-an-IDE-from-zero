@@ -5,6 +5,8 @@ import com.zeroide.api.Subscription;
 import com.zeroide.api.WorkspaceService;
 import com.zeroide.api.CommandDescriptor;
 import com.zeroide.api.CommandService;
+import com.zeroide.api.LanguageDefinition;
+import com.zeroide.api.LanguageService;
 import com.zeroide.api.events.TextChangedEvent;
 import com.zeroide.api.events.PluginLoadedEvent;
 import com.zeroide.api.events.PluginUnloadedEvent;
@@ -21,9 +23,11 @@ import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.geometry.Side;
 import javafx.scene.Scene;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -59,6 +63,7 @@ import java.util.Locale;
 public final class ZeroIdeApp extends Application {
     private RichCodeEditor editor;
     private Label fileLabel;
+    private Label languageLabel;
     private Label workspaceLabel;
     private Label projectNameLabel;
     private Label metricsLabel;
@@ -76,6 +81,7 @@ public final class ZeroIdeApp extends Application {
     private JavaFxEditorService editorService;
     private JavaFxUiService uiService;
     private WorkspaceService workspaceService;
+    private LanguageService languageService;
     private CommandService commandService;
     private Subscription workspaceSubscription;
     private Subscription pluginLoadedSubscription;
@@ -116,6 +122,7 @@ public final class ZeroIdeApp extends Application {
         editorService = (JavaFxEditorService) container.getBean(EditorService.class);
         uiService = container.getBean(JavaFxUiService.class);
         workspaceService = container.getBean(WorkspaceService.class);
+        languageService = container.getBean(LanguageService.class);
         commandService = uiService;
 
         configureCoreCommands(stage);
@@ -149,6 +156,7 @@ public final class ZeroIdeApp extends Application {
         pluginManager.loadAll();
         updateMetrics();
         updateWorkspaceLabel();
+        updateLanguageLabel();
     }
 
     private void configureWindowIcon(Stage stage) {
@@ -494,6 +502,9 @@ public final class ZeroIdeApp extends Application {
     private HBox buildStatusBar() {
         fileLabel = new Label("Untitled");
         fileLabel.getStyleClass().add("status-item");
+        languageLabel = new Label("Lang: Plain Text");
+        languageLabel.getStyleClass().addAll("status-item", "language-status-item");
+        languageLabel.setOnMouseClicked(ignored -> showLanguageMenu());
         workspaceLabel = new Label("No workspace");
         workspaceLabel.getStyleClass().add("status-item");
         metricsLabel = new Label("");
@@ -502,7 +513,7 @@ public final class ZeroIdeApp extends Application {
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox statusBar = new HBox(14, workspaceLabel, fileLabel, metricsLabel, spacer);
+        HBox statusBar = new HBox(14, workspaceLabel, fileLabel, languageLabel, metricsLabel, spacer);
         statusBar.getStyleClass().add("status-bar");
         statusBar.setPadding(new Insets(0, 12, 0, 12));
         return statusBar;
@@ -513,12 +524,14 @@ public final class ZeroIdeApp extends Application {
         commandService.registerCommand("core.file.new", "File: New", "Shortcut+N", () -> {
             editorService.newFile();
             fileLabel.setText("Untitled");
+            updateLanguageLabel();
         });
         commandService.registerCommand("core.file.open", "File: Open File", "Shortcut+O", () -> openFile(stage));
         commandService.registerCommand("core.file.open-folder", "File: Open Folder", "Shortcut+K", () -> openWorkspace(stage));
         commandService.registerCommand("core.file.save", "File: Save", "Shortcut+S", () -> {
             editorService.saveCurrentFile();
             updateFileLabel();
+            updateLanguageLabel();
         });
         commandService.registerCommand("core.file.save-as", "File: Save As", "Shortcut+Shift+S", () -> saveAs(stage));
         commandService.registerCommand("core.view.toggle-sidebar", "View: Toggle Sidebar", "Shortcut+B", this::toggleSidebar);
@@ -592,10 +605,12 @@ public final class ZeroIdeApp extends Application {
     private void configurePluginEvents() {
         pluginLoadedSubscription = container.getBean(com.zeroide.api.EventBus.class).subscribe(PluginLoadedEvent.class, ignored -> {
             editorService.refreshLanguage();
+            updateLanguageLabel();
             refreshPluginManager();
         });
         pluginUnloadedSubscription = container.getBean(com.zeroide.api.EventBus.class).subscribe(PluginUnloadedEvent.class, ignored -> {
             editorService.refreshLanguage();
+            updateLanguageLabel();
             refreshPluginManager();
         });
     }
@@ -607,6 +622,7 @@ public final class ZeroIdeApp extends Application {
         if (file != null) {
             editorService.openFile(file.toPath());
             updateFileLabel();
+            updateLanguageLabel();
         }
     }
 
@@ -617,6 +633,7 @@ public final class ZeroIdeApp extends Application {
         if (file != null) {
             editorService.saveAs(file.toPath());
             updateFileLabel();
+            updateLanguageLabel();
         }
     }
 
@@ -734,6 +751,42 @@ public final class ZeroIdeApp extends Application {
         fileLabel.setText(editorService.getCurrentFile()
                 .map(path -> path.getFileName().toString())
                 .orElse("Untitled"));
+    }
+
+    private void updateLanguageLabel() {
+        if (languageLabel == null || editorService == null || languageService == null) {
+            return;
+        }
+        String languageName = editorService.getLanguageId()
+                .flatMap(languageService::language)
+                .map(LanguageDefinition::displayName)
+                .orElse("Plain Text");
+        languageLabel.setText("Lang: " + languageName);
+    }
+
+    private void showLanguageMenu() {
+        ContextMenu menu = new ContextMenu();
+        MenuItem plainText = new MenuItem("Plain Text");
+        plainText.setOnAction(ignored -> switchLanguage(null));
+        menu.getItems().add(plainText);
+
+        List<LanguageDefinition> languages = languageService.languages().stream()
+                .sorted((left, right) -> left.displayName().compareToIgnoreCase(right.displayName()))
+                .toList();
+        if (!languages.isEmpty()) {
+            menu.getItems().add(new SeparatorMenuItem());
+        }
+        for (LanguageDefinition language : languages) {
+            MenuItem item = new MenuItem(language.displayName());
+            item.setOnAction(ignored -> switchLanguage(language.id()));
+            menu.getItems().add(item);
+        }
+        menu.show(languageLabel, Side.TOP, 0, 0);
+    }
+
+    private void switchLanguage(String languageId) {
+        editorService.setLanguageId(languageId);
+        updateLanguageLabel();
     }
 
     private void updateWorkspaceLabel() {
