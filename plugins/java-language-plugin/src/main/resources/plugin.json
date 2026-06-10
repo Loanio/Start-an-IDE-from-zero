@@ -1,0 +1,7 @@
+{
+  "id": "java-language",
+  "name": "Java Language",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.javalanguage.JavaLanguagePlugin",
+  "dependencies": []
+}

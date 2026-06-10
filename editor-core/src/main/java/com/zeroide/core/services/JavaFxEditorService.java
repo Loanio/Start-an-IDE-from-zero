@@ -2,6 +2,7 @@ package com.zeroide.core.services;
 
 import com.zeroide.api.EditorService;
 import com.zeroide.api.EventBus;
+import com.zeroide.api.LanguageService;
 import com.zeroide.api.events.FileOpenedEvent;
 import com.zeroide.api.events.FileSavedEvent;
 import com.zeroide.core.editor.RichCodeEditor;
@@ -23,12 +24,14 @@ public final class JavaFxEditorService implements EditorService {
     private final RichCodeEditor editor;
     private final Window owner;
     private final EventBus eventBus;
+    private final LanguageService languageService;
     private Path currentFile;
 
-    public JavaFxEditorService(RichCodeEditor editor, Window owner, EventBus eventBus) {
+    public JavaFxEditorService(RichCodeEditor editor, Window owner, EventBus eventBus, LanguageService languageService) {
         this.editor = editor;
         this.owner = owner;
         this.eventBus = eventBus;
+        this.languageService = languageService;
     }
 
     @Override
@@ -67,6 +70,7 @@ public final class JavaFxEditorService implements EditorService {
         try {
             String text = Files.readString(path, StandardCharsets.UTF_8);
             currentFile = path;
+            refreshLanguage();
             replaceText(text);
             eventBus.publish(new FileOpenedEvent(path, text));
         } catch (IOException ex) {
@@ -97,11 +101,20 @@ public final class JavaFxEditorService implements EditorService {
 
     public void newFile() {
         currentFile = null;
+        refreshLanguage();
         replaceText("");
+    }
+
+    public void refreshLanguage() {
+        String languageId = languageService.detectLanguage(currentFile)
+                .map(language -> language.id())
+                .orElse(null);
+        runOnFxThread(() -> editor.setLanguageId(languageId));
     }
 
     public void saveAs(Path path) {
         currentFile = path;
+        refreshLanguage();
         saveCurrentFile();
     }
 

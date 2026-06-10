@@ -1,48 +1,36 @@
 package com.zeroide.core.editor;
 
+import com.zeroide.api.HighlightSpan;
+import com.zeroide.api.HighlightingService;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public final class RichCodeEditor extends CodeArea {
-    private static final String[] KEYWORDS = new String[]{
-            "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class",
-            "const", "continue", "default", "do", "double", "else", "enum", "extends", "final",
-            "finally", "float", "for", "goto", "if", "implements", "import", "instanceof", "int",
-            "interface", "long", "native", "new", "package", "private", "protected", "public",
-            "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this",
-            "throw", "throws", "transient", "try", "void", "volatile", "while", "var", "record",
-            "sealed", "permits", "non-sealed", "yield"
-    };
-
-    private static final String KEYWORD_PATTERN = "\\b(" + String.join("|", KEYWORDS) + ")\\b";
-    private static final String STRING_PATTERN = "\"([^\"\\\\]|\\\\.)*\"";
-    private static final String CHAR_PATTERN = "'([^'\\\\]|\\\\.)'";
-    private static final String COMMENT_PATTERN = "//[^\\n]*|/\\*(.|\\R)*?\\*/";
-    private static final String NUMBER_PATTERN = "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?[fFdDlL]?\\b";
-    private static final String BRACE_PATTERN = "[{}()\\[\\]]";
-
-    private static final Pattern TOKEN_PATTERN = Pattern.compile(
-            "(?<KEYWORD>" + KEYWORD_PATTERN + ")"
-                    + "|(?<STRING>" + STRING_PATTERN + ")"
-                    + "|(?<CHAR>" + CHAR_PATTERN + ")"
-                    + "|(?<COMMENT>" + COMMENT_PATTERN + ")"
-                    + "|(?<NUMBER>" + NUMBER_PATTERN + ")"
-                    + "|(?<BRACE>" + BRACE_PATTERN + ")"
-    );
+    private HighlightingService highlightingService;
+    private String languageId;
 
     public RichCodeEditor() {
         getStyleClass().add("code-editor");
         setWrapText(false);
         setParagraphGraphicFactory(LineNumberFactory.get(this));
         textProperty().addListener((ignored, oldText, newText) -> applyHighlighting(newText));
+    }
+
+    public void setHighlightingService(HighlightingService highlightingService) {
+        this.highlightingService = highlightingService;
+        applyHighlighting(getText());
+    }
+
+    public void setLanguageId(String languageId) {
+        this.languageId = languageId;
+        applyHighlighting(getText());
     }
 
     public void setInitialText(String text) {
@@ -53,44 +41,47 @@ public final class RichCodeEditor extends CodeArea {
     }
 
     private void applyHighlighting(String text) {
-        setStyleSpans(0, computeHighlighting(text == null ? "" : text));
+        setStyleSpans(0, computeHighlighting(text == null ? "" : text, highlightingService, languageId));
     }
 
-    private static StyleSpans<Collection<String>> computeHighlighting(String text) {
-        Matcher matcher = TOKEN_PATTERN.matcher(text);
-        int lastKeywordEnd = 0;
-        StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
+    private static StyleSpans<Collection<String>> computeHighlighting(String text, HighlightingService highlightingService, String languageId) {
+        List<HighlightSpan> spans = highlightingService == null || languageId == null
+                ? List.of(new HighlightSpan(text.length(), null))
+                : highlightingService.highlighter(languageId)
+                .map(highlighter -> highlighter.highlight(text))
+                .orElseGet(() -> List.of(new HighlightSpan(text.length(), null)));
+        return toStyleSpans(text.length(), spans);
+    }
 
-        while (matcher.find()) {
-            String styleClass = styleClassFor(matcher);
-            spansBuilder.add(Collections.emptyList(), matcher.start() - lastKeywordEnd);
-            spansBuilder.add(List.of(styleClass), matcher.end() - matcher.start());
-            lastKeywordEnd = matcher.end();
+    private static StyleSpans<Collection<String>> toStyleSpans(int textLength, List<HighlightSpan> spans) {
+        StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
+        int consumed = 0;
+
+        for (HighlightSpan span : new ArrayList<>(spans)) {
+            if (consumed >= textLength) {
+                break;
+            }
+            int length = Math.max(0, Math.min(span.length(), textLength - consumed));
+            if (length == 0) {
+                continue;
+            }
+            spansBuilder.add(styleClasses(span.styleClass()), length);
+            consumed += length;
         }
 
-        spansBuilder.add(Collections.emptyList(), text.length() - lastKeywordEnd);
+        if (consumed < textLength) {
+            spansBuilder.add(Collections.emptyList(), textLength - consumed);
+        }
+        if (textLength == 0) {
+            spansBuilder.add(Collections.emptyList(), 0);
+        }
         return spansBuilder.create();
     }
 
-    private static String styleClassFor(Matcher matcher) {
-        if (matcher.group("KEYWORD") != null) {
-            return "keyword";
+    private static Collection<String> styleClasses(String styleClass) {
+        if (styleClass == null || styleClass.isBlank()) {
+            return Collections.emptyList();
         }
-        if (matcher.group("STRING") != null) {
-            return "string";
-        }
-        if (matcher.group("CHAR") != null) {
-            return "char";
-        }
-        if (matcher.group("COMMENT") != null) {
-            return "comment";
-        }
-        if (matcher.group("NUMBER") != null) {
-            return "number";
-        }
-        if (matcher.group("BRACE") != null) {
-            return "brace";
-        }
-        return "";
+        return List.of(styleClass);
     }
 }

@@ -1,0 +1,7 @@
+dependencies {
+    compileOnly project(":editor-api")
+}
+
+tasks.named("jar") {
+    archiveBaseName = "json-language-plugin"
+}

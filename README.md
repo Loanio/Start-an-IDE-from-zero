@@ -6,7 +6,7 @@ Zero IDE 是一个基于 Java 21、Gradle、JavaFX 的小型插件化文本编�
 
 - Java 21 LTS
 - Gradle 多模块构建
-- JavaFX `TextArea` 编辑器界面
+- JavaFX + RichTextFX 编辑器界面
 - 插件 API + 反射 + `URLClassLoader`
 - `plugin.json` 插件描述文件
 - Spring `GenericApplicationContext` 管理核心服务
@@ -22,6 +22,11 @@ zero-ide
 ├── editor-core                # JavaFX 应用、插件管理器、事件总线、文件服务
 └── plugins
     ├── word-count-plugin      # 字数统计状态栏插件
+    ├── java-language-plugin   # Java 文件类型与语法高亮插件
+    ├── markdown-language-plugin # Markdown 文件类型与语法高亮插件
+    ├── json-language-plugin   # JSON 文件类型与语法高亮插件
+    ├── json-tools-plugin      # JSON 格式化与压缩插件
+    ├── todo-explorer-plugin   # TODO/FIXME 列表插件
     ├── markdown-tools-plugin  # Markdown 菜单与大纲插件
     ├── java-snippets-plugin   # Java 代码片段插件
     ├── file-tree-plugin       # 文件树插件
@@ -50,6 +55,8 @@ build/runtime/plugins
 ```
 
 然后启动 JavaFX 编辑器。启动时核心应用会扫描该目录，读取每个 jar 根目录下的 `plugin.json`，再按依赖关系加载插件。
+
+插件可以在界面中通过 `Plugins -> Manage Plugins` 打开管理面板，查看已加载插件并单独卸载。卸载依赖插件时，依赖它的插件会自动一起卸载。
 
 如果你已经全局安装了 Gradle，也可以使用：
 
@@ -82,10 +89,11 @@ public interface Plugin {
 
 ## 核心设计
 
-- `EditorContext` 暴露编辑器服务、事件总线和 UI 服务。
+- `EditorContext` 暴露编辑器服务、事件总线、UI 服务、语言服务、高亮服务和片段服务。
 - `DynamicPluginManager` 负责扫描 jar、读取描述文件、校验依赖、反射创建插件实例、加载和卸载插件。
 - `DefaultEventBus` 使用观察者模式，插件可以订阅 `TextChangedEvent`、`FileOpenedEvent`、`FileSavedEvent` 等事件。
 - `JavaFxUiService` 允许插件添加状态栏项、菜单项、工具面板和信息弹窗。
+- `LanguageService`、`HighlightingService` 和 `SnippetService` 允许插件动态注册文件类型、语法高亮和代码片段。
 - 卸载插件时会调用 `onUnload()`，移除 UI 扩展，并关闭对应 `URLClassLoader`。
 
 ## 测试
@@ -96,7 +104,7 @@ public interface Plugin {
 
 ## 后续扩展方向
 
-- 用 RichTextFX 替换 JavaFX `TextArea`，实现真正的语法高亮。
+- 增加更多语言插件，例如 JSON、Python、YAML。
 - 增加插件权限模型，限制不可信插件访问核心资源。
 - 增加插件依赖版本范围和冲突检测。
 - 增加代码补全插件、宏录制插件。

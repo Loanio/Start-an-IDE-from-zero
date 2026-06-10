@@ -1,0 +1,7 @@
+{
+  "id": "json-language",
+  "name": "JSON Language",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.jsonlanguage.JsonLanguagePlugin",
+  "dependencies": []
+}

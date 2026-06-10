@@ -14,4 +14,10 @@ public interface EditorContext {
     CommandService commands();
 
     NotificationService notifications();
+
+    LanguageService languages();
+
+    HighlightingService highlighting();
+
+    SnippetService snippets();
 }

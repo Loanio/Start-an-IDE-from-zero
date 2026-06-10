@@ -744,6 +744,21 @@
     -fx-text-fill: #ffffff;
 }
 
+.plugin-manager-list {
+    -fx-background-color: #171819;
+    -fx-control-inner-background: #171819;
+}
+
+.plugin-manager-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent #25282b transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.plugin-manager-row {
+    -fx-padding: 3 0;
+}
+
 .plugin-output {
     -fx-background-color: #141516;
     -fx-background-insets: 0;
@@ -1080,6 +1095,15 @@
     -fx-font-weight: 700;
 }
 
+.code-editor .property {
+    -fx-fill: #9cdcfe;
+}
+
+.code-editor .literal {
+    -fx-fill: #569cd6;
+    -fx-font-weight: 700;
+}
+
 .code-editor .string,
 .code-editor .char {
     -fx-fill: #ce9178;
@@ -1096,6 +1120,24 @@
 .code-editor .brace {
     -fx-fill: #d4d4d4;
     -fx-font-weight: 700;
+}
+
+.code-editor .markup-heading {
+    -fx-fill: #dbeafe;
+    -fx-font-weight: 700;
+}
+
+.code-editor .markup-quote {
+    -fx-fill: #9cdcfe;
+}
+
+.code-editor .markup-list {
+    -fx-fill: #4ec9b0;
+}
+
+.code-editor .markup-code {
+    -fx-fill: #dcdcaa;
+    -fx-font-family: "Cascadia Mono", "Consolas", monospace;
 }
 
 .code-editor .scroll-pane {

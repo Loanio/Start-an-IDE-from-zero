@@ -1,0 +1,7 @@
+{
+  "id": "todo-explorer",
+  "name": "TODO Explorer",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.todo.TodoExplorerPlugin",
+  "dependencies": []
+}

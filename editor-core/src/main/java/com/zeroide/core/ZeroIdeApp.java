@@ -6,11 +6,15 @@ import com.zeroide.api.WorkspaceService;
 import com.zeroide.api.CommandDescriptor;
 import com.zeroide.api.CommandService;
 import com.zeroide.api.events.TextChangedEvent;
+import com.zeroide.api.events.PluginLoadedEvent;
+import com.zeroide.api.events.PluginUnloadedEvent;
 import com.zeroide.api.events.WorkspaceChangedEvent;
 import com.zeroide.core.editor.RichCodeEditor;
 import com.zeroide.core.plugins.DynamicPluginManager;
+import com.zeroide.core.plugins.LoadedPlugin;
 import com.zeroide.core.services.CoreContainer;
 import com.zeroide.core.services.JavaFxEditorService;
+import com.zeroide.core.services.JavaFxUiService;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -70,10 +74,14 @@ public final class ZeroIdeApp extends Application {
     private CoreContainer container;
     private DynamicPluginManager pluginManager;
     private JavaFxEditorService editorService;
+    private JavaFxUiService uiService;
     private WorkspaceService workspaceService;
     private CommandService commandService;
     private Subscription workspaceSubscription;
+    private Subscription pluginLoadedSubscription;
+    private Subscription pluginUnloadedSubscription;
     private Menu recentWorkspacesMenu;
+    private ListView<LoadedPlugin> pluginManagerList;
     private StackPane appRoot;
     private VBox commandPalette;
     private TextField commandPaletteInput;
@@ -106,13 +114,15 @@ public final class ZeroIdeApp extends Application {
         container = CoreContainer.create(editor, menuBar, statusBar, sidebarPanelTabs, toolPanelTabs, bottomPanelTabs, stage, pluginDirectory);
         pluginManager = container.getBean(DynamicPluginManager.class);
         editorService = (JavaFxEditorService) container.getBean(EditorService.class);
+        uiService = container.getBean(JavaFxUiService.class);
         workspaceService = container.getBean(WorkspaceService.class);
-        commandService = container.getBean(com.zeroide.core.services.JavaFxUiService.class);
+        commandService = uiService;
 
         configureCoreCommands(stage);
         configureMenus(menuBar, stage);
         configureEditorEvents();
         configureWorkspaceEvents();
+        configurePluginEvents();
 
         BorderPane root = new BorderPane();
         root.getStyleClass().add("app-root");
@@ -133,7 +143,7 @@ public final class ZeroIdeApp extends Application {
         stage.setTitle("Zero IDE");
         configureWindowIcon(stage);
         stage.setScene(scene);
-        container.getBean(com.zeroide.core.services.JavaFxUiService.class).attachScene(scene);
+        uiService.attachScene(scene);
         stage.show();
 
         pluginManager.loadAll();
@@ -224,6 +234,12 @@ public final class ZeroIdeApp extends Application {
         }
         if (workspaceSubscription != null) {
             workspaceSubscription.close();
+        }
+        if (pluginLoadedSubscription != null) {
+            pluginLoadedSubscription.close();
+        }
+        if (pluginUnloadedSubscription != null) {
+            pluginUnloadedSubscription.close();
         }
         if (container != null) {
             container.close();
@@ -512,6 +528,7 @@ public final class ZeroIdeApp extends Application {
         commandService.registerCommand("core.plugins.load-all", "Plugins: Load All", () -> {
             pluginManager.loadAll();
         });
+        commandService.registerCommand("core.plugins.manage", "Plugins: Manage Plugins", this::showPluginManager);
         commandService.registerCommand("core.plugins.unload-all", "Plugins: Unload All", () -> pluginManager.unloadAll());
     }
 
@@ -531,8 +548,9 @@ public final class ZeroIdeApp extends Application {
         Menu pluginMenu = new Menu("Plugins");
         MenuItem loadJar = commandItem("core.plugins.load-jar");
         MenuItem loadAll = commandItem("core.plugins.load-all");
+        MenuItem manage = commandItem("core.plugins.manage");
         MenuItem unloadAll = commandItem("core.plugins.unload-all");
-        pluginMenu.getItems().addAll(loadJar, loadAll, unloadAll);
+        pluginMenu.getItems().addAll(loadJar, loadAll, manage, new SeparatorMenuItem(), unloadAll);
 
         Menu viewMenu = new Menu("View");
         MenuItem commandPalette = commandItem("core.command-palette.show");
@@ -568,6 +586,17 @@ public final class ZeroIdeApp extends Application {
         workspaceSubscription = container.getBean(com.zeroide.api.EventBus.class).subscribe(WorkspaceChangedEvent.class, ignored -> {
             updateWorkspaceLabel();
             refreshRecentWorkspacesMenu();
+        });
+    }
+
+    private void configurePluginEvents() {
+        pluginLoadedSubscription = container.getBean(com.zeroide.api.EventBus.class).subscribe(PluginLoadedEvent.class, ignored -> {
+            editorService.refreshLanguage();
+            refreshPluginManager();
+        });
+        pluginUnloadedSubscription = container.getBean(com.zeroide.api.EventBus.class).subscribe(PluginUnloadedEvent.class, ignored -> {
+            editorService.refreshLanguage();
+            refreshPluginManager();
         });
     }
 
@@ -608,6 +637,90 @@ public final class ZeroIdeApp extends Application {
         var file = chooser.showOpenDialog(editor.getScene().getWindow());
         if (file != null) {
             pluginManager.load(file.toPath());
+        }
+    }
+
+    private void showPluginManager() {
+        if (pluginManagerList == null) {
+            pluginManagerList = buildPluginManagerList();
+            VBox panel = buildPluginManagerPanel();
+            uiService.addToolPanel("core.plugins.manager", "Plugins", panel);
+        }
+        refreshPluginManager();
+        uiService.selectPanel("core.plugins.manager");
+    }
+
+    private VBox buildPluginManagerPanel() {
+        Label title = new Label("Loaded Plugins");
+        title.getStyleClass().add("plugin-panel-title");
+        Label meta = new Label("Unload individual plugins without restarting the IDE.");
+        meta.getStyleClass().add("plugin-panel-meta");
+
+        Button refresh = new Button("Refresh");
+        refresh.getStyleClass().add("plugin-quiet-button");
+        refresh.setOnAction(ignored -> refreshPluginManager());
+
+        HBox header = new HBox(8, new VBox(2, title, meta), spacer(), refresh);
+        header.getStyleClass().add("plugin-panel-header");
+
+        VBox panel = new VBox(8, header, pluginManagerList);
+        panel.getStyleClass().add("plugin-panel");
+        VBox.setVgrow(pluginManagerList, Priority.ALWAYS);
+        return panel;
+    }
+
+    private ListView<LoadedPlugin> buildPluginManagerList() {
+        ListView<LoadedPlugin> list = new ListView<>();
+        list.getStyleClass().add("plugin-manager-list");
+        list.setCellFactory(ignored -> new ListCell<>() {
+            @Override
+            protected void updateItem(LoadedPlugin plugin, boolean empty) {
+                super.updateItem(plugin, empty);
+                if (empty || plugin == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+                setText(null);
+                setGraphic(pluginRow(plugin));
+            }
+        });
+        return list;
+    }
+
+    private HBox pluginRow(LoadedPlugin plugin) {
+        var descriptor = plugin.descriptor();
+        Label name = new Label(descriptor.name() + "  " + descriptor.version());
+        name.getStyleClass().add("plugin-panel-title");
+        Label id = new Label(descriptor.id());
+        id.getStyleClass().add("plugin-panel-meta");
+        Label path = new Label(plugin.jarPath().getFileName().toString());
+        path.getStyleClass().add("plugin-path-label");
+
+        Button unload = new Button("Unload");
+        unload.getStyleClass().add("plugin-quiet-button");
+        unload.setOnAction(ignored -> {
+            pluginManager.unload(descriptor.id());
+            refreshPluginManager();
+        });
+
+        VBox labels = new VBox(4, name, id, path);
+        HBox row = new HBox(8, labels, spacer(), unload);
+        row.getStyleClass().add("plugin-manager-row");
+        row.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(labels, Priority.ALWAYS);
+        return row;
+    }
+
+    private void refreshPluginManager() {
+        if (pluginManagerList == null || pluginManager == null) {
+            return;
+        }
+        Runnable refresh = () -> pluginManagerList.setItems(FXCollections.observableArrayList(pluginManager.loadedPlugins()));
+        if (Platform.isFxApplicationThread()) {
+            refresh.run();
+        } else {
+            Platform.runLater(refresh);
         }
     }
 

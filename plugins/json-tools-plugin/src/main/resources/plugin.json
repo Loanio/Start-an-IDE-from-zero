@@ -1,0 +1,7 @@
+{
+  "id": "json-tools",
+  "name": "JSON Tools",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.jsontools.JsonToolsPlugin",
+  "dependencies": ["json-language"]
+}

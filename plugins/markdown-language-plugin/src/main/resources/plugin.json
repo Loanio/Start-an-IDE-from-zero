@@ -1,0 +1,7 @@
+{
+  "id": "markdown-language",
+  "name": "Markdown Language",
+  "version": "0.1.0",
+  "entryClass": "com.zeroide.plugins.markdownlanguage.MarkdownLanguagePlugin",
+  "dependencies": []
+}

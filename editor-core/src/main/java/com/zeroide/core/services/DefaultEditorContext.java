@@ -4,8 +4,11 @@ import com.zeroide.api.CommandService;
 import com.zeroide.api.EditorContext;
 import com.zeroide.api.EditorService;
 import com.zeroide.api.EventBus;
+import com.zeroide.api.HighlightingService;
+import com.zeroide.api.LanguageService;
 import com.zeroide.api.NotificationService;
 import com.zeroide.api.PanelService;
+import com.zeroide.api.SnippetService;
 import com.zeroide.api.UIService;
 import com.zeroide.api.WorkspaceService;
 
@@ -16,6 +19,9 @@ public record DefaultEditorContext(
         WorkspaceService workspace,
         PanelService panels,
         CommandService commands,
-        NotificationService notifications
+        NotificationService notifications,
+        LanguageService languages,
+        HighlightingService highlighting,
+        SnippetService snippets
 ) implements EditorContext {
 }
